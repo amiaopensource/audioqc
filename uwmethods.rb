@@ -1,5 +1,16 @@
 # frozen_string_literal: true
 
+# Get OS
+if RUBY_PLATFORM.include?('linux')
+  LINUX = true
+elsif RUBY_PLATFORM.include?('darwin')
+  MACOS = true
+else
+  #others
+end
+
+
+
 class Iterator
   def initialize(value)
     @value = value
@@ -11,12 +22,15 @@ class Iterator
   end
 end
 
-def get_os
-  if RUBY_PLATFORM.include?('linux')
-    system = 'linux'
-  elsif RUBY_PLATFORM.include?('darwin')
-    system = 'mac'
+def preview_camera
+  ffmpeg_device_options = []
+  if LINUX
+    ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
+  elsif MACOS
+    ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
   end
+  ffplay_command = ['ffplay', ffmpeg_device_options].flatten
+  system(*ffplay_command)
 end
 
 class MediaObject
@@ -35,8 +49,7 @@ class MediaObject
   end
 
   def get_mime
-    system = get_os
-    if ['linux', 'mac'].include?(system)
+    if LINUX || MACOS
       `file -b --mime-type #{@input_path}`.strip
     else
       ## Filler for windows
@@ -59,4 +72,9 @@ class MediaObject
       system('ffmpeg', '-i', @input_path, '-c:v', 'h264', output)
     end
   end
+
+  def take_photo
+    output = get_output_location
+  end
+
 end
