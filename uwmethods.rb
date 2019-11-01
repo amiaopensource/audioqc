@@ -19,13 +19,10 @@ def get_os
   end
 end
 
-class Media_Object
+class MediaObject
   def initialize(value)
-    @system = get_os
     @input_path = value
-    if @system == 'linux' || @system == 'mac'
-      mime_type = `file -b --mime-type #{@input_path}`.strip
-    end
+    mime_type = get_mime
     if File.file?(@input_path) && mime_type.include?('audio')
       @input_is_audio = true
     elsif File.file?(@input_path) && mime_type.include?('video')
@@ -37,22 +34,29 @@ class Media_Object
     end
   end
 
-  def make_derivative
-    root_name = File.basename(@input_path, '.*')
-    out_dir = File.dirname(@input_path)
-    if @input_is_audio
-      output = "#{out_dir}/#{root_name}.flac"
-      system('ffmpeg', '-i', @input_path.to_s, '-c:a', 'flac', output.to_s)
+  def get_mime
+    system = get_os
+    if ['linux', 'mac'].include?(system)
+      `file -b --mime-type #{@input_path}`.strip
+    else
+      ## Filler for windows
     end
   end
 
-  def test
-    if @input_is_file
-      puts 'FILE'
-    elsif @input_is_dir
-      puts 'DIR'
-    else
-      puts 'DUNNO!'
+  def get_output_location
+    root_name = File.basename(@input_path, '.*')
+    out_dir = File.dirname(@input_path)
+    "#{out_dir}/#{root_name}"
+  end
+
+  def make_derivative
+    output = get_output_location
+    if @input_is_audio
+      output += '.flac'
+      system('ffmpeg', '-i', @input_path, '-c:a', 'flac', output)
+    elsif @input_is_video
+      output += '.mp4'
+      system('ffmpeg', '-i', @input_path, '-c:v', 'h264', output)
     end
   end
 end
