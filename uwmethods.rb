@@ -33,17 +33,6 @@ def preview_camera
   system(*ffplay_command)
 end
 
-def take_photo(output_name)
-  ffmpeg_device_options = []
-  ffmpeg_middle_options = []
-  if LINUX
-    ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
-  elsif MAC
-    ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
-  end
-  ffmpeg_command = ['ffmpeg', ffmpeg_device_options, '-window_title "Press Escape When Ready To Continue"', output_name].flatten
-end
-
 class MediaObject
   def initialize(value)
     @input_path = value
@@ -84,10 +73,32 @@ class MediaObject
     end
   end
 
+  def take_photo(output_name)
+    ffmpeg_device_options = []
+    ffmpeg_middle_options = ['-vframes', '1', '-q:v', '2', '-y']
+    if LINUX
+      ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
+    elsif MAC
+      ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
+    end
+    ffmpeg_command = ['ffmpeg', ffmpeg_device_options, ffmpeg_middle_options, output_name].flatten
+    system(*ffmpeg_command)
+  end
+
   def take_photos
-    iteration = Iterator.new(1)
-    output = [get_output_location, '_', iteration.to_s , '.jpg'].join
+    unless defined?(@iterator)
+      @iterator = 1
+    end
+    output = [get_output_location, '_', format('%02d', @iterator), '.jpg'].join
     preview_camera
     take_photo(output)
+    puts "Take another picture? (y)"
+    user_response = gets.chomp
+    if user_response == 'y'
+      @iterator += 1
+      take_photos
+    elsif user_response == 'r'
+      take_photos 
+    end
   end
 end
