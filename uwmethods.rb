@@ -24,12 +24,13 @@ end
 
 def preview_camera
   ffmpeg_device_options = []
+  ffmpeg_middle_options = ['-vf', 'scale=1280:-2,crop=out_w=800:out_h=800']
   if LINUX
     ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
   elsif MACOS
     ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
   end
-  ffplay_command = ['ffplay', ffmpeg_device_options].flatten
+  ffplay_command = ['ffplay', ffmpeg_device_options, ffmpeg_middle_options].flatten
   system(*ffplay_command)
 end
 
@@ -75,7 +76,7 @@ class MediaObject
 
   def take_photo(output_name)
     ffmpeg_device_options = []
-    ffmpeg_middle_options = ['-vframes', '1', '-q:v', '2', '-y']
+    ffmpeg_middle_options = ['-vframes', '1', '-q:v', '1', '-y', '-vf', 'scale=1280:-2,crop=out_w=800:out_h=800']
     if LINUX
       ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
     elsif MAC
@@ -92,7 +93,7 @@ class MediaObject
     output = [get_output_location, '_', format('%02d', @iterator), '.jpg'].join
     preview_camera
     take_photo(output)
-    puts "Take another picture? (y)"
+    puts "Take another picture? Enter y for yes, r for retake and anything else to finish"
     user_response = gets.chomp
     if user_response == 'y'
       @iterator += 1
