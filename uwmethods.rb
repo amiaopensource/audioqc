@@ -63,6 +63,7 @@ class MediaObject
     "#{out_dir}/#{root_name}"
   end
 
+  # Redo this with actual specs
   def make_derivative
     output = get_output_location
     if @input_is_audio
@@ -71,6 +72,18 @@ class MediaObject
     elsif @input_is_video
       output += '.mp4'
       system('ffmpeg', '-i', @input_path, '-c:v', 'h264', output)
+    end
+  end
+
+  def make_metadata
+    output = get_output_location
+    output_media_info = "#{output}_mediainfo.xml"
+    output_mediatrace = "#{output}_mediatrace.xml"
+    output_ffprobe = "#{output}_ffprobe.xml"
+    if LINUX || MAC
+      File.open(output_mediatrace, 'w') { |file| file.write(`mediaconch -mi -mt -fx "#{@input_path}"`) }
+      File.open(output_media_info, 'w') { |file| file.write(`mediaconch -mi -fx "#{@input_path}"`) }
+      File.open(output_ffprobe, 'w') { |file| file.write(`ffprobe 2> /dev/null "#{@input_path}" -show_format -show_streams -show_data -show_error -show_versions -show_chapters -noprivate -of xml="q=1:x=1"`) }
     end
   end
 
