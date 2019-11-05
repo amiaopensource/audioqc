@@ -94,7 +94,6 @@ end
 
 def get_mediainfo(input)
   mediainfo_out = MediaInfo.from(input)
-  return mediainfo_out
 end
 
 def qc_encoding_history(mediainfo_out)
@@ -195,13 +194,15 @@ file_inputs.each do |fileinput|
   elsif phase_fails.count > 50
     warnings << 'PHASE WARNING'
   end
-  if Quiet && warnings.empty?
-    puts "QC Pass!"
-    exit 0
-  elsif Quiet
-    puts "QC Fail!"
-    puts warnings
-    exit 1 
+  if defined? Quiet
+    if Quiet && warnings.empty?
+      puts "QC Pass!"
+      exit 0
+    elsif Quiet
+      puts "QC Fail!"
+      puts warnings
+      exit 1
+    end 
   else
     @write_to_csv << [fileinput, warnings.flatten, duration_normalized, max_level, dangerous_levels.count, phase_fails.count, media_conch_results]
   end
