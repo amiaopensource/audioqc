@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 require 'bagit'
 require 'mediainfo'
 
@@ -7,8 +8,6 @@ if RUBY_PLATFORM.include?('linux')
   LINUX = true
 elsif RUBY_PLATFORM.include?('darwin')
   MACOS = true
-else
-  #others
 end
 
 def preview_camera
@@ -89,19 +88,28 @@ class MediaObject
   end
 
   def take_photos
-    unless defined?(@iterator)
-      @iterator = 1
-    end
+    @iterator = 1 unless defined?(@iterator)
     output = [get_output_location, '_', format('%02d', @iterator), '.jpg'].join
     preview_camera
     take_photo(output)
-    puts "Take another picture? Enter y for yes, r for retake and anything else to finish"
+    puts 'Take another picture? Enter y for yes, r for retake and anything else to finish'
     user_response = gets.chomp
     if user_response == 'y'
       @iterator += 1
       take_photos
     elsif user_response == 'r'
-      take_photos 
+      take_photos
     end
   end
+
+  def move_media(destination)
+    if File.directory?(destination)
+      rsync_command = ['rsync', '--remove-source-files', '-tvPih', @input_path, destination]
+      if system(*rsync_command)
+        @input_path = "#{destination}/#{File.basename(@input_path)}"
+      end
+    end
+  end
+
+  def structure_package; end
 end
