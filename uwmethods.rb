@@ -111,5 +111,9 @@ class MediaObject
     end
   end
 
-  def structure_package; end
+
+
+  def structure_package
+    #some stuff here
+  end
 end
