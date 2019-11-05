@@ -1,4 +1,6 @@
 # frozen_string_literal: true
+require 'bagit'
+require 'mediainfo'
 
 # Get OS
 if RUBY_PLATFORM.include?('linux')
@@ -7,19 +9,6 @@ elsif RUBY_PLATFORM.include?('darwin')
   MACOS = true
 else
   #others
-end
-
-
-
-class Iterator
-  def initialize(value)
-    @value = value
-  end
-
-  def increase
-    @value += 1
-    format('%02d', @value)
-  end
 end
 
 def preview_camera
