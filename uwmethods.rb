@@ -22,9 +22,23 @@ def preview_camera
   system(*ffplay_command)
 end
 
-class MediaObject
+class Sip
+  def move_media(destination)
+    if File.directory?(destination)
+      rsync_command = ['rsync', '--remove-source-files', '-tvPih', @input_path, destination]
+      if system(*rsync_command)
+        @input_path = "#{destination}/#{File.basename(@input_path)}"
+      end
+    end
+  end
+end
+
+class MediaObject < Sip
   def initialize(value)
     @input_path = value
+    @main_objects = [@input_path]
+    @derivative_objects = []
+    @tech_meta = []
     mime_type = get_mime
     if File.file?(@input_path) && mime_type.include?('audio')
       @input_is_audio = true
@@ -56,10 +70,13 @@ class MediaObject
     output = get_output_location
     if @input_is_audio
       output += '.flac'
-      system('ffmpeg', '-i', @input_path, '-c:a', 'flac', output)
+      command = ['ffmpeg', '-i', @input_path, '-c:a', 'flac', output]
     elsif @input_is_video
       output += '.mp4'
-      system('ffmpeg', '-i', @input_path, '-c:v', 'h264', output)
+      command = ['ffmpeg', '-i', @input_path, '-c:v', 'h264', output]
+    end
+    if system(*command)
+      @derivative_objects << output
     end
   end
 
@@ -69,9 +86,15 @@ class MediaObject
     output_mediatrace = "#{output}_mediatrace.xml"
     output_ffprobe = "#{output}_ffprobe.xml"
     if LINUX || MAC
-      File.open(output_mediatrace, 'w') { |file| file.write(`mediaconch -mi -mt -fx "#{@input_path}"`) }
-      File.open(output_media_info, 'w') { |file| file.write(`mediaconch -mi -fx "#{@input_path}"`) }
-      File.open(output_ffprobe, 'w') { |file| file.write(`ffprobe 2> /dev/null "#{@input_path}" -show_format -show_streams -show_data -show_error -show_versions -show_chapters -noprivate -of xml="q=1:x=1"`) }
+      if File.open(output_mediatrace, 'w') { |file| file.write(`mediaconch -mi -mt -fx "#{@input_path}"`) }
+        @tech_meta << output_mediatrace
+      end
+      if File.open(output_media_info, 'w') { |file| file.write(`mediaconch -mi -fx "#{@input_path}"`) }
+        @tech_meta << output_media_info
+      end
+      if File.open(output_ffprobe, 'w') { |file| file.write(`ffprobe 2> /dev/null "#{@input_path}" -show_format -show_streams -show_data -show_error -show_versions -show_chapters -noprivate -of xml="q=1:x=1"`) }
+        @tech_meta << output_ffprobe
+      end
     end
   end
 
@@ -84,7 +107,9 @@ class MediaObject
       ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
     end
     ffmpeg_command = ['ffmpeg', ffmpeg_device_options, ffmpeg_middle_options, output_name].flatten
-    system(*ffmpeg_command)
+    if system(*ffmpeg_command)
+      @main_objects << output_name
+    end
   end
 
   def take_photos
@@ -100,20 +125,5 @@ class MediaObject
     elsif user_response == 'r'
       take_photos
     end
-  end
-
-  def move_media(destination)
-    if File.directory?(destination)
-      rsync_command = ['rsync', '--remove-source-files', '-tvPih', @input_path, destination]
-      if system(*rsync_command)
-        @input_path = "#{destination}/#{File.basename(@input_path)}"
-      end
-    end
-  end
-
-
-
-  def structure_package
-    #some stuff here
   end
 end
