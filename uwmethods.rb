@@ -112,8 +112,9 @@ class MediaObject < Sip
   end
 
   def take_photos
+    paths = get_output_location
     @iterator = 1 unless defined?(@iterator)
-    output = [get_output_location, '_', format('%02d', @iterator), '.jpg'].join
+    output = [paths.join('/'), '_', format('%02d', @iterator), '.jpg'].join
     preview_camera
     take_photo(output)
     puts 'Take another picture? Enter y for yes, r for retake and anything else to finish'
