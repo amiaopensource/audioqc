@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require 'bagit'
-require 'mediainfo'
-require 'pry'
 
 # Get OS
 if RUBY_PLATFORM.include?('linux')
@@ -65,7 +63,7 @@ class MediaObject < Sip
   end
 
   # Redo this with actual specs
-  def make_derivative
+  def make_derivatives
     paths = get_output_location.insert(2, 'derivatives')
     deriv_dir = paths[0..2].join('/')
     unless File.directory?(deriv_dir)
@@ -73,13 +71,13 @@ class MediaObject < Sip
     end
     output = paths.join('/')
     if @input_is_audio
-      output += '.flac'
-      command = ['ffmpeg', '-i', @input_path, '-c:a', 'flac', output]
+      flac_command = ['flac', '--best', '--keep-foreign-metadata', '--preserve-modtime', '--verify', '--output-prefix', deriv_dir + '/', @input_path]
+      ffmpeg_command = ['ffmpeg', '-i', @input_path, '-c:a', 'libmp3lame', '-write_id3v1', '1', '-id3v2_version', '3', '-dither_method', 'triangular', '-af', 'dynaudnorm=g=81', '-metadata', 'Normalization="ffmpeg dynaudnorm=g=81"', '-qscale:a', '2', output + '.mp3']
+      system(*flac_command)
     elsif @input_is_video
-      output += '.mp4'
-      command = ['ffmpeg', '-i', @input_path, '-c:v', 'h264', output]
+      ffmpeg_command = ['ffmpeg', '-i', @input_path, '-c:v', 'h264', output + '.mp4']
     end
-    system(*command)
+    system(*ffmpeg_command)
   end
 
   def make_metadata
@@ -125,6 +123,19 @@ class MediaObject < Sip
     elsif user_response == 'r'
       take_photos
     end
+  end
+
+  def move_associated
+    #
+  end
+
+  def move_to_package
+    paths = get_output_location
+    destination = paths[0..1].join('/')
+    if File.directory?(destination)
+      rsync_command = ['rsync', '--remove-source-files', '-tvPih', @input_path, destination]
+    end
+    system(*rsync_command)
   end
 end
 
