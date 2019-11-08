@@ -130,9 +130,8 @@ def parse_ffprobe_peak_levels(ffprobe_data)
     peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
     if peaklevel > -2.0
       high_db_frames << peaklevel
-    else
-      levels << peaklevel
     end
+    levels << peaklevel
   end
   return high_db_frames, levels.max
 end
