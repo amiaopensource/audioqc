@@ -185,12 +185,16 @@ file_inputs.each do |fileinput|
   media_conch_results = media_conch_scan(fileinput, POLICY_FILE).to_s
   if media_conch_results.include?('pass!')
     media_conch_results = 'PASS'
+  else
+    warnings << 'MEDIACONCH FAIL'
   end
   if encoding_hist_error.count > 0 
     warnings  << encoding_hist_error
-  elsif dangerous_levels.count > 0
+  end
+  if dangerous_levels.count > 0
     warnings << 'LEVEL WARNING'
-  elsif phase_fails.count > 50
+  end
+  if phase_fails.count > 50
     warnings << 'PHASE WARNING'
   end
   if defined? Quiet
