@@ -3,6 +3,8 @@
 require 'bagit'
 
 # Get OS
+LINUX = false
+MACOS = false
 if RUBY_PLATFORM.include?('linux')
   LINUX = true
 elsif RUBY_PLATFORM.include?('darwin')
@@ -90,7 +92,7 @@ class MediaObject < Sip
     output_media_info = "#{output}_mediainfo.xml"
     output_mediatrace = "#{output}_mediatrace.xml"
     output_ffprobe = "#{output}_ffprobe.xml"
-    if LINUX || MAC
+    if LINUX || MACOS
       File.open(output_mediatrace, 'w') { |file| file.write(`mediaconch -mi -mt -fx "#{@input_path}"`) }
       File.open(output_media_info, 'w') { |file| file.write(`mediaconch -mi -fx "#{@input_path}"`) }
       File.open(output_ffprobe, 'w') { |file| file.write(`ffprobe 2> /dev/null "#{@input_path}" -show_format -show_streams -show_data -show_error -show_versions -show_chapters -noprivate -of xml="q=1:x=1"`) }
@@ -102,7 +104,7 @@ class MediaObject < Sip
     ffmpeg_middle_options = ['-vframes', '1', '-q:v', '1', '-y', '-vf', 'scale=1280:-2,crop=out_w=800:out_h=800']
     if LINUX
       ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
-    elsif MAC
+    elsif MACOS
       ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
     end
     ffmpeg_command = ['ffmpeg', ffmpeg_device_options, ffmpeg_middle_options, output_name].flatten
