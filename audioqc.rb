@@ -15,6 +15,7 @@ ARGV.options do |opts|
   opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
   opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val }
   opts.on('-q', '--Quiet') { Quiet = true }
+  opts.on('-m', '--Meta-only') { Meta_only = true}
   opts.parse!
 end
 
@@ -70,75 +71,90 @@ unless defined? POLICY_FILE
   POLICY_FILE.rewind
 end
 
-# Function to scan file for mediaconch compliance
-def media_conch_scan(input, policy)
-  qc_results = []
-  policy_path = File.path(policy)
-  command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + input + '"'
-  media_conch_out = `#{command}`
-  media_conch_out.strip!
-  media_conch_out.split('/n').each do |qcline|
-    qc_results << qcline
+class QcTarget
+  def initialize(value)
+    @input_path = value
+    @warnings = []
   end
-  qc_results
-end
 
-# Functions to scan audio stream characteristics
-# Function to get ffprobe json info
-def get_ffprobe(input)
-  ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + input + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
-  ffprobe_out = JSON.parse(`#{ffprobe_command}`)
-end
-
-def get_mediainfo(input)
-  mediainfo_out = MediaInfo.from(input)
-end
-
-def qc_encoding_history(mediainfo_out)
-  enc_hist_error = []
-  unless mediainfo_out.general.extra.nil?
-    if mediainfo_out.general.extra.bext_present == 'Yes' && mediainfo_out.general.encoded_library_settings
-      if mediainfo_out.audio.channels == 1
-        mono_count = mediainfo_out.general.encoded_library_settings.scan(/mono/).count
-        unless mono_count == 2
-          enc_hist_error << "BEXT Coding History channels don't match file"
-        end
-      end
-
-      if mediainfo_out.audio.channels == 2
-        stereo_count = mediainfo_out.general.encoded_library_settings.scan(/stereo/).count
-        dual_count = mediainfo_out.general.encoded_library_settings.scan(/dual/).count
-        unless stereo_count + dual_count == 2
-          enc_hist_error << "BEXT Coding History channels don't match file"
-        end
-      end
+  # Function to scan file for mediaconch compliance
+  def media_conch_scan(policy)
+    @qc_results = []
+    policy_path = File.path(policy)
+    command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
+    media_conch_out = `#{command}`
+    media_conch_out.strip!
+    media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
+    @qc_results = @qc_results.to_s
+    if @qc_results.include?('pass!')
+      @qc_results = 'PASS'
+    else
+      @warnings << 'MEDIACONCH FAIL'
     end
   end
-  enc_hist_error
-end
 
-def parse_duration(duration_milliseconds)
-  Time.at(duration_milliseconds / 1000).utc.strftime('%H:%M:%S')
-end
-
-def parse_ffprobe_peak_levels(ffprobe_data)
-  high_db_frames = []
-  levels = []
-  ffprobe_data['frames'].each do |frames|
-    peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
-    high_db_frames << peaklevel if peaklevel > -2.0
-    levels << peaklevel
+  # Functions to scan audio stream characteristics
+  # Function to get ffprobe json info
+  def get_ffprobe
+    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + @input_path + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
+    @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
+    @total_frame_count = @ffprobe_out['frames'].count
   end
-  [high_db_frames, levels.max]
-end
 
-def parse_ffprobe_phase(ffprobe_data)
-  out_of_phase_frames = []
-  ffprobe_data['frames'].each do |frames|
-    audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
-    out_of_phase_frames << audiophase if audiophase < -0.25
+  def get_mediainfo
+    @mediainfo_out = MediaInfo.from(@input_path)
+    @duration_normalized = Time.at(@mediainfo_out.audio.duration / 1000).utc.strftime('%H:%M:%S')
   end
-  out_of_phase_frames
+
+  def qc_encoding_history
+    @enc_hist_error = []
+    unless @mediainfo_out.general.extra.nil?
+      if @mediainfo_out.general.extra.bext_present == 'Yes' && @mediainfo_out.general.encoded_library_settings
+        signal_chain_count = @mediainfo_out.general.encoded_library_settings.scan(/A=/).count
+        if @mediainfo_out.audio.channels == 1
+          unless @mediainfo_out.general.encoded_library_settings.scan(/mono/).count == signal_chain_count
+            @enc_hist_error << "BEXT Coding History channels don't match file"
+          end
+        end
+
+        if @mediainfo_out.audio.channels == 2
+          stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/).count
+          dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/).count
+          unless stereo_count + dual_count == signal_chain_count
+            @enc_hist_error << "BEXT Coding History channels don't match file"
+          end
+        end
+      end
+    else
+      @enc_hist_error << "Encoding history not present"
+    end
+    @warnings << encoding_hist_error if @encoding_hist_error.count > 0
+  end
+
+  def find_peaks
+    @high_db_frames = []
+    @levels = []
+    @ffprobe_out['frames'].each do |frames|
+      peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
+      @high_db_frames << peaklevel if peaklevel > -2.0
+      @levels << peaklevel
+      @max_level = @levels.max
+    end
+    @warnings << 'LEVEL WARNING' if @high_db_frames.count > 0
+  end
+
+  def find_phase
+    @out_of_phase_frames = []
+    @ffprobe_out['frames'].each do |frames|
+      audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
+      @out_of_phase_frames << audiophase if audiophase < -0.25
+    end
+    @warnings << 'PHASE WARNING' if @out_of_phase_frames.count > 50
+  end
+
+  def output_csv_line
+    [@input_path, @warnings.flatten, @duration_normalized, @max_level, @high_db_frames.count, @out_of_phase_frames.count, @qc_results]
+  end
 end
 
 # Make list of inputs
@@ -165,26 +181,12 @@ if file_inputs.empty?
 end
 
 file_inputs.each do |fileinput|
-  warnings = []
-  fileinput = File.expand_path(fileinput)
-  ffprobe_out = get_ffprobe(fileinput)
-  mediainfo_out = get_mediainfo(fileinput)
-  duration_normalized = parse_duration(mediainfo_out.audio.duration)
-  encoding_hist_error = qc_encoding_history(mediainfo_out)
-  total_frame_count = ffprobe_out['frames'].count
-  level_info = parse_ffprobe_peak_levels(ffprobe_out)
-  max_level = level_info[1]
-  dangerous_levels = level_info[0]
-  phase_fails = parse_ffprobe_phase(ffprobe_out)
-  media_conch_results = media_conch_scan(fileinput, POLICY_FILE).to_s
-  if media_conch_results.include?('pass!')
-    media_conch_results = 'PASS'
-  else
-    warnings << 'MEDIACONCH FAIL'
-  end
-  warnings << encoding_hist_error if encoding_hist_error.count > 0
-  warnings << 'LEVEL WARNING' if dangerous_levels.count > 0
-  warnings << 'PHASE WARNING' if phase_fails.count > 50
+  target = QcTarget.new(File.expand_path(fileinput))
+  target.get_ffprobe
+  target.get_mediainfo
+  target.find_peaks
+  target.find_phase
+  target.media_conch_scan(POLICY_FILE)
   if defined? Quiet
     if Quiet && warnings.empty?
       puts 'QC Pass!'
@@ -195,7 +197,7 @@ file_inputs.each do |fileinput|
       exit 1
     end
   else
-    @write_to_csv << [fileinput, warnings.flatten, duration_normalized, max_level, dangerous_levels.count, phase_fails.count, media_conch_results]
+    @write_to_csv << target.output_csv_line
   end
 end
 
