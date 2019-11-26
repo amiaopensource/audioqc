@@ -162,6 +162,9 @@ class QcTarget
   def output_csv_line
     [@input_path, @warnings.flatten, @duration_normalized, @max_level, @high_level_count, @phasey_frame_count, @qc_results]
   end
+  def output_warnings
+    @warnings
+  end
 end
 
 # Make list of inputs
@@ -199,13 +202,13 @@ file_inputs.each do |fileinput|
    target.find_peaks
    target.find_phase
  end
-  if defined? Quiet
-    if Quiet && warnings.empty?
+  if options.include? 'quiet'
+    if target.output_warnings.empty?
       puts 'QC Pass!'
       exit 0
-    elsif Quiet
+    else
       puts 'QC Fail!'
-      puts warnings
+      puts target.output_warnings
       exit 1
     end
   else
