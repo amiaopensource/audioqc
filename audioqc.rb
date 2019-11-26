@@ -11,13 +11,17 @@ require 'mediainfo'
 # -p option allows you to select a custom mediaconch policy file - otherwise script uses default
 # -e allows you to select a target file extenstion for the script to use.
 # If no extenstion is specified it will target the default 'wav' extension. (Not case sensitive)
+options = []
 ARGV.options do |opts|
   opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
   opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val }
-  opts.on('-q', '--Quiet') { Quiet = true }
-  opts.on('-m', '--Meta-only') { Meta_only = true}
+  opts.on('-q', '--Quiet') { options << 'quiet' }
+  opts.on('-m', '--meta-scan') { options << 'meta' }
+  opts.on('-s', '--signal-scan') { options << 'signal' }
   opts.parse!
 end
+
+options += ['signal', 'meta'] unless (options & ['meta', 'signal']).any?
 
 # set up arrays and variables
 TARGET_EXTENSION = 'wav' unless defined? TARGET_EXTENSION
@@ -128,38 +132,41 @@ class QcTarget
     else
       @enc_hist_error << "Encoding history not present"
     end
-    @warnings << encoding_hist_error if @encoding_hist_error.count > 0
+    @warnings << @enc_hist_error if @enc_hist_error.count > 0
   end
 
   def find_peaks
-    @high_db_frames = []
+    high_db_frames = []
     @levels = []
     @ffprobe_out['frames'].each do |frames|
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
-      @high_db_frames << peaklevel if peaklevel > -2.0
+      high_db_frames << peaklevel if peaklevel > -2.0
       @levels << peaklevel
       @max_level = @levels.max
     end
-    @warnings << 'LEVEL WARNING' if @high_db_frames.count > 0
+    @high_level_count = high_db_frames.count
+    @warnings << 'LEVEL WARNING' if @high_level_count > 0
+
   end
 
   def find_phase
-    @out_of_phase_frames = []
+    out_of_phase_frames = []
     @ffprobe_out['frames'].each do |frames|
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
-      @out_of_phase_frames << audiophase if audiophase < -0.25
+      out_of_phase_frames << audiophase if audiophase < -0.25
     end
-    @warnings << 'PHASE WARNING' if @out_of_phase_frames.count > 50
+    @phasey_frame_count = out_of_phase_frames.count
+    @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
 
   def output_csv_line
-    [@input_path, @warnings.flatten, @duration_normalized, @max_level, @high_db_frames.count, @out_of_phase_frames.count, @qc_results]
+    [@input_path, @warnings.flatten, @duration_normalized, @max_level, @high_level_count, @phasey_frame_count, @qc_results]
   end
 end
 
 # Make list of inputs
 file_inputs = []
-@write_to_csv = []
+write_to_csv = []
 ARGV.each do |input|
   # If input is directory, recursively add all files with target extension to target list
   if File.directory?(input)
@@ -182,11 +189,16 @@ end
 
 file_inputs.each do |fileinput|
   target = QcTarget.new(File.expand_path(fileinput))
-  target.get_ffprobe
-  target.get_mediainfo
-  target.find_peaks
-  target.find_phase
-  target.media_conch_scan(POLICY_FILE)
+  if options.include? 'meta'
+    target.get_mediainfo
+    target.media_conch_scan(POLICY_FILE)
+    target.qc_encoding_history
+  end
+  if options.include? 'signal'
+   target.get_ffprobe
+   target.find_peaks
+   target.find_phase
+ end
   if defined? Quiet
     if Quiet && warnings.empty?
       puts 'QC Pass!'
@@ -197,7 +209,7 @@ file_inputs.each do |fileinput|
       exit 1
     end
   else
-    @write_to_csv << target.output_csv_line
+    write_to_csv << target.output_csv_line
   end
 end
 
@@ -207,7 +219,7 @@ output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
 CSV.open(output_csv, 'wb') do |csv|
   headers = ['Filename', 'Warnings', 'Duration', 'Peak Level', 'Number of Frames w/ High Levels', 'Number of Phase Warnings', 'MediaConch Policy Compliance']
   csv << headers
-  @write_to_csv.each do |line|
+  write_to_csv.each do |line|
     csv << line
   end
 end
