@@ -4,7 +4,6 @@ require 'flammarion'
 require 'yaml'
 require 'mediainfo'
 require 'optparse'
-require 'pry'
 
 InputItemNumbers = []
 HuskyLinks = ['https://web.archive.org/web/20090820093233/http://geocities.com/aleharobed/siberian_husky_run_mini.gif',
