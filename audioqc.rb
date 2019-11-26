@@ -135,27 +135,21 @@ class QcTarget
     @warnings << @enc_hist_error if @enc_hist_error.count > 0
   end
 
-  def find_peaks
+  def find_peaks_n_phase
     high_db_frames = []
+    out_of_phase_frames = []
     @levels = []
     @ffprobe_out['frames'].each do |frames|
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
-      high_db_frames << peaklevel if peaklevel > -2.0
-      @levels << peaklevel
-      @max_level = @levels.max
-    end
-    @high_level_count = high_db_frames.count
-    @warnings << 'LEVEL WARNING' if @high_level_count > 0
-
-  end
-
-  def find_phase
-    out_of_phase_frames = []
-    @ffprobe_out['frames'].each do |frames|
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
       out_of_phase_frames << audiophase if audiophase < -0.25
+      high_db_frames << peaklevel if peaklevel > -2.0
+      @levels << peaklevel
     end
+    @max_level = @levels.max
+    @high_level_count = high_db_frames.count
     @phasey_frame_count = out_of_phase_frames.count
+    @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
 
@@ -199,8 +193,7 @@ file_inputs.each do |fileinput|
   end
   if options.include? 'signal'
    target.get_ffprobe
-   target.find_peaks
-   target.find_phase
+   target.find_peaks_n_phase
  end
   if options.include? 'quiet'
     if target.output_warnings.empty?
