@@ -49,7 +49,7 @@ class MediaObject < Sip
 
   def get_mime
     if LINUX || MACOS
-      `file -b --mime-type #{@input_path}`.strip
+      `file -b --mime-type "#{@input_path}"`.strip
     else
       ## Filler for windows
     end
@@ -73,14 +73,17 @@ class MediaObject < Sip
       Dir.mkdir(deriv_dir)
     end
     output = paths.join('/')
+    mezzanine = output + '_48kHz.wav'
     if @input_is_audio
-      flac_command = ['flac', '--best', '--keep-foreign-metadata', '--preserve-modtime', '--verify', '--output-prefix', deriv_dir + '/', @input_path]
-      ffmpeg_command = ['ffmpeg', '-i', @input_path, '-c:a', 'libmp3lame', '-write_id3v1', '1', '-id3v2_version', '3', '-dither_method', 'triangular', '-af', 'dynaudnorm=g=81', '-metadata', 'Normalization="ffmpeg dynaudnorm=g=81"', '-qscale:a', '2', output + '.mp3']
+      flac_command = ['flac', '--best', '--keep-foreign-metadata', '--preserve-modtime', '--verify', '--delete-input-file', '--output-prefix', deriv_dir + '/', mezzanine]
+      ffmpeg_command_mezzanine = ['ffmpeg', '-i', @input_path, '-c:a', 'pcm_s24le', '-ar', '48000', '-af', 'dynaudnorm=g=81', mezzanine ]
+      ffmpeg_command_access = ['ffmpeg', '-i', @input_path, '-c:a', 'libmp3lame', '-write_id3v1', '1', '-id3v2_version', '3', '-dither_method', 'triangular', '-af', 'dynaudnorm=g=81', '-metadata', 'Normalization="ffmpeg dynaudnorm=g=81"', '-qscale:a', '2', output + '.mp3']
+      system(*ffmpeg_command_mezzanine)
       system(*flac_command)
     elsif @input_is_video
-      ffmpeg_command = ['ffmpeg', '-i', @input_path, '-c:v', 'h264', output + '.mp4']
+      ffmpeg_command_access = ['ffmpeg', '-i', @input_path, '-c:v', 'h264', output + '.mp4']
     end
-    system(*ffmpeg_command)
+    system(*ffmpeg_command_access)
   end
 
   def make_metadata
@@ -113,10 +116,10 @@ class MediaObject < Sip
     end
   end
 
-  def update_coding_hist
+  def update_coding_hist(target)
     bext_data=`bwfmetaedit --out-core  #{@input_path}`.split('"')
     new_hist = bext_data.select{|element| element.include?("A=")}[0] + "A=PCM,F=48000,W=24,M=#{get_channels},T=FFmpeg"
-    system('bwfmetaedit',"--history=#{new_hist}", @input_path)
+    system('bwfmetaedit',"--history=#{new_hist}", target)
   end
 
   def take_photo(output_name)
