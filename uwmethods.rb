@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'bagit'
+require 'mediainfo'
 
 # Get OS
 LINUX = false
@@ -99,13 +100,32 @@ class MediaObject < Sip
     end
   end
 
+  def get_channels
+    media_data = MediaInfo.from(File.path(@input_path))
+    if media_data.audio.channels == 1
+      channels = 'mono'
+    elsif media_data.audio.channels == 2
+      channels = 'stereo'
+    elsif media_data.audio.channels == 4
+      channels = 'quad'
+    else
+      channels = media_data.audio.channels.to_s
+    end
+  end
+
+  def update_coding_hist
+    bext_data=`bwfmetaedit --out-core  #{@input_path}`.split('"')
+    new_hist = bext_data.select{|element| element.include?("A=")}[0] + "A=PCM,F=48000,W=24,M=#{get_channels},T=FFmpeg"
+    system('bwfmetaedit',"--history=#{new_hist}", @input_path)
+  end
+
   def take_photo(output_name)
     ffmpeg_device_options = []
-    ffmpeg_middle_options = ['-vframes', '1', '-q:v', '1', '-y', '-vf', 'scale=1280:-2,crop=out_w=800:out_h=800']
+    ffmpeg_middle_options = ['-vframes', '1', '-q:v', '1', '-y']
     if LINUX
       ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
     elsif MACOS
-      ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
+      ffmpeg_device_options += ['-f', 'avfoundation', '-video_size', '640x480', '-i', 'default']
     end
     ffmpeg_command = ['ffmpeg', ffmpeg_device_options, ffmpeg_middle_options, output_name].flatten
     system(*ffmpeg_command)
@@ -143,11 +163,11 @@ end
 
 def preview_camera
   ffmpeg_device_options = []
-  ffmpeg_middle_options = ['-vf', 'scale=1280:-2,crop=out_w=800:out_h=800']
+  ffmpeg_middle_options = []
   if LINUX
     ffmpeg_device_options += ['-f', 'v4l2', '-i', '/dev/video0']
   elsif MACOS
-    ffmpeg_device_options += ['-f', 'avfoundation', '-i', 'default']
+    ffmpeg_device_options += ['-f', 'avfoundation', '-video_size' , '640x480', '-i', 'default']
   end
   ffplay_command = ['ffplay', ffmpeg_device_options, ffmpeg_middle_options].flatten
   system(*ffplay_command)
