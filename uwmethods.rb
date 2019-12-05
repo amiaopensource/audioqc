@@ -2,6 +2,7 @@
 
 require 'bagit'
 require 'mediainfo'
+require 'pry'
 
 # Get OS
 LINUX = false
@@ -31,6 +32,14 @@ class Sip
     end
   end
 end
+
+  def get_time
+    Time.now.strftime("%H:%M:%S")
+  end
+
+  def get_date
+    Time.now.strftime("%Y-%m-%d")
+  end
 
 class MediaObject < Sip
   def initialize(value)
@@ -65,25 +74,47 @@ class MediaObject < Sip
     [base_dir, project_dir, root_name]
   end
 
-  # Redo this with actual specs
-  def make_derivatives
+  def get_derivative_paths
     paths = get_output_location.insert(2, 'derivatives')
     deriv_dir = paths[0..2].join('/')
     unless File.directory?(deriv_dir)
       Dir.mkdir(deriv_dir)
     end
-    output = paths.join('/')
-    mezzanine = output + '_48kHz.wav'
+    paths.join('/')
+  end
+
+  # Redo this with actual specs
+  def make_derivatives
+    output = get_derivative_paths
+    build_audio_mezzanine_command(output)
     if @input_is_audio
-      flac_command = ['flac', '--best', '--keep-foreign-metadata', '--preserve-modtime', '--verify', '--delete-input-file', '--output-prefix', deriv_dir + '/', mezzanine]
-      ffmpeg_command_mezzanine = ['ffmpeg', '-i', @input_path, '-c:a', 'pcm_s24le', '-ar', '48000', '-af', 'dynaudnorm=g=81', mezzanine ]
+      flac_command = build_flac_command(output)
+      ffmpeg_command_mezzanine = build_audio_mezzanine_command(output)
       ffmpeg_command_access = ['ffmpeg', '-i', @input_path, '-c:a', 'libmp3lame', '-write_id3v1', '1', '-id3v2_version', '3', '-dither_method', 'triangular', '-af', 'dynaudnorm=g=81', '-metadata', 'Normalization="ffmpeg dynaudnorm=g=81"', '-qscale:a', '2', output + '.mp3']
-      system(*ffmpeg_command_mezzanine)
+      system(*build_audio_mezzanine_command(output))
       system(*flac_command)
     elsif @input_is_video
       ffmpeg_command_access = ['ffmpeg', '-i', @input_path, '-c:v', 'h264', output + '.mp4']
     end
     system(*ffmpeg_command_access)
+  end
+
+  def build_audio_mezzanine_command(output)
+    mezzanine = output + '_48kHz.wav'
+    ['ffmpeg', '-i', @input_path, '-map_metadata', '-1', '-c:a', 'pcm_s24le', '-ar', '48000', '-af', 'dynaudnorm=g=81', '-write_bext', '1', build_bext, mezzanine].flatten
+  end
+
+  def build_flac_command(output)
+    mezzanine = output + '_48kHz.wav'
+    flac_out = "#{File.dirname(output)}/"
+    ['flac', '--best', '--keep-foreign-metadata', '--preserve-modtime', '--verify', '--delete-input-file', '--output-prefix', flac_out, mezzanine]
+  end
+
+  def build_bext
+    bext_meta_command = []
+    bext_meta_command << "origination_date=#{get_date}"
+    bext_meta_command << "origination_time=#{get_time}"
+    bext_meta_command.flat_map {|meta| ['-metadata', meta]}
   end
 
   def make_metadata
