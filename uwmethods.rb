@@ -2,7 +2,6 @@
 
 require 'bagit'
 require 'mediainfo'
-require 'pry'
 
 # Get OS
 LINUX = false
@@ -107,13 +106,37 @@ class MediaObject < Sip
   def build_flac_command(output)
     mezzanine = output + '_48kHz.wav'
     flac_out = "#{File.dirname(output)}/"
-    ['flac', '--best', '--keep-foreign-metadata', '--preserve-modtime', '--verify', '--delete-input-file', '--output-prefix', flac_out, mezzanine]
+    ['flac', '--best', '--keep-foreign-metadata', "--tag=Description=Decode with --keep-foreign-metadata to access embedded BEXT chunk", '--preserve-modtime', '--verify', '--delete-input-file', '--output-prefix', flac_out, mezzanine]
+  end
+
+  def grab_bext
+    media_data = MediaInfo.from(File.path(@input_path))
+    originator = media_data.general.archival_location
+    originator_reference = media_data.general.extra.producer_reference
+    description = media_data.general.description
+    coding_history = media_data.general.encoded_library_settings.gsub(" / ", "\n")
+    [description, originator, coding_history, originator_reference]
+  end
+
+  def update_coding_hist(target)
+    bext_data = grab_bext
+    new_hist = bext_data[1] + "\\nA=PCM,F=48000,W=24,M=#{get_channels},T=FFmpeg"
+    system('bwfmetaedit',"--history=#{new_hist}", target)
   end
 
   def build_bext
+    bext_data = grab_bext
+    new_hist = bext_data[2] + "\nA=PCM,F=48000,W=24,M=#{get_channels},T=FFmpeg"
+    new_description = bext_data[0] + "-LOUDNESS NORMALIZED MEZZANINE"
     bext_meta_command = []
+    bext_meta_command << "description=#{new_description}"
+    bext_meta_command << "originator=#{bext_data[3]}"
+    bext_meta_command << "originator_reference=#{bext_data[1]}"
     bext_meta_command << "origination_date=#{get_date}"
     bext_meta_command << "origination_time=#{get_time}"
+    bext_meta_command << "origination_time=#{get_time}"
+    bext_meta_command << "coding_history=#{new_hist}"
+    bext_meta_command << "IARL=#{bext_data[3]}"
     bext_meta_command.flat_map {|meta| ['-metadata', meta]}
   end
 
@@ -145,12 +168,6 @@ class MediaObject < Sip
     else
       channels = media_data.audio.channels.to_s
     end
-  end
-
-  def update_coding_hist(target)
-    bext_data=`bwfmetaedit --out-core  #{@input_path}`.split('"')
-    new_hist = bext_data.select{|element| element.include?("A=")}[0] + "A=PCM,F=48000,W=24,M=#{get_channels},T=FFmpeg"
-    system('bwfmetaedit',"--history=#{new_hist}", target)
   end
 
   def take_photo(output_name)
