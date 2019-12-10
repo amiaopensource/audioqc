@@ -100,9 +100,13 @@ class QcTarget
   # Functions to scan audio stream characteristics
   # Function to get ffprobe json info
   def get_ffprobe
-    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + @input_path + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
+    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + @input_path + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
     @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
     @total_frame_count = @ffprobe_out['frames'].count
+  end
+
+  def normalize_time(time_source)
+    Time.at(time_source).utc.strftime('%H:%M:%S:%m')
   end
 
   def get_mediainfo
@@ -135,9 +139,24 @@ class QcTarget
     @warnings << @enc_hist_error if @enc_hist_error.count > 0
   end
 
+  def check_dropouts
+    @possible_drops = []
+    @sample_ratios.each_with_index do |ratio, i|
+      unless i + 1 == @sample_ratios.length
+        diff_prior = (ratio - @sample_ratios[i - 1]).abs
+        diff_post = (ratio - @sample_ratios[i + 1]).abs
+        if diff_prior > 15 && diff_post > 15
+          @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out.audio.samplingrate) 
+        end
+      end
+    end
+    @warnings << "Possible Dropouts Detected" if @possible_drops.length > 0
+  end
+
   def find_peaks_n_phase
     high_db_frames = []
     out_of_phase_frames = []
+    @sample_ratios = []
     @levels = []
     @ffprobe_out['frames'].each do |frames|
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
@@ -145,6 +164,7 @@ class QcTarget
       out_of_phase_frames << audiophase if audiophase < -0.25
       high_db_frames << peaklevel if peaklevel > -2.0
       @levels << peaklevel
+      @sample_ratios << frames['tags']['lavfi.astats.Overall.Max_difference'].to_f / frames['tags']['lavfi.astats.Overall.Mean_difference'].to_f
     end
     @max_level = @levels.max
     @high_level_count = high_db_frames.count
@@ -154,7 +174,7 @@ class QcTarget
   end
 
   def output_csv_line
-    [@input_path, @warnings.flatten, @duration_normalized, @max_level, @high_level_count, @phasey_frame_count, @qc_results]
+    [@input_path, @warnings.flatten, @duration_normalized, @possible_drops, @max_level, @high_level_count, @phasey_frame_count, @qc_results]
   end
   def output_warnings
     @warnings
@@ -194,6 +214,7 @@ file_inputs.each do |fileinput|
   if options.include? 'signal'
    target.get_ffprobe
    target.find_peaks_n_phase
+   target.check_dropouts
  end
   if options.include? 'quiet'
     if target.output_warnings.empty?
@@ -213,7 +234,7 @@ timestamp = Time.now.strftime('%Y-%m-%d_%H-%M-%S')
 output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
 
 CSV.open(output_csv, 'wb') do |csv|
-  headers = ['Filename', 'Warnings', 'Duration', 'Peak Level', 'Number of Frames w/ High Levels', 'Number of Phase Warnings', 'MediaConch Policy Compliance']
+  headers = ['Filename', 'Warnings', 'Duration', 'Possible Drops', 'Peak Level', 'Number of Frames w/ High Levels', 'Number of Phase Warnings', 'MediaConch Policy Compliance']
   csv << headers
   write_to_csv.each do |line|
     csv << line
