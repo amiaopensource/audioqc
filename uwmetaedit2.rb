@@ -54,14 +54,14 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
   modtime = moddatetime.strftime("%H:%M:%S")
   history = codeHist1 + "\n" + codeHist2
   unless itemNumber.nil?
-    description = "Collection number: #{collNumber}, " + "Item Number: #{itemNumber}, " + "Original File Name #{File.basename('/home/weaver/Desktop/test.wav',".*")}"
+    description = "Collection number: #{collNumber}, " + "Item Number: #{itemNumber}, " + "Original File Name: #{File.basename(targetFile,".*")}"
   else
-    description = "Collection number: #{collNumber}, " + "Item Number: #{itemNumber}, " + "Original File Name #{File.basename('/home/weaver/Desktop/test.wav',".*")}"
+    description = "Collection number: #{collNumber}, " + "Original File Name #{File.basename(targetFile,".*")}"
   end
   command << 'bwfmetaedit' 
   command << '--reject-overwrite'
   command << "--Originator=#{origin}"
-  command << "--Description=Collection number: #{collNumber}, Item number: #{itemNumber}"
+  command << "--Description=#{description}"
   command << "--OriginatorReference=#{File.basename(targetFile)}"
   command << "--History=#{history}"
   command << "--IARL=#{origin}"
