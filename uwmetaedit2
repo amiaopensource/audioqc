@@ -53,6 +53,8 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
   moddate = moddatetime.strftime("%Y-%m-%d")
   modtime = moddatetime.strftime("%H:%M:%S")
   history = codeHist1 + "\n" + codeHist2
+  originator_reference = File.basename(targetFile)
+  originator_reference = 'See description for identifiers' if originator_reference.length > 36
   unless itemNumber.nil?
     description = "Collection number: #{collNumber}, " + "Item Number: #{itemNumber}, " + "Original File Name: #{File.basename(targetFile,".*")}"
   else
@@ -62,7 +64,7 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
   command << '--reject-overwrite'
   command << "--Originator=#{origin}"
   command << "--Description=#{description}"
-  command << "--OriginatorReference=#{File.basename(targetFile)}"
+  command << "--OriginatorReference=#{originator_reference}"
   command << "--History=#{history}"
   command << "--IARL=#{origin}"
   command << "--OriginationDate=#{moddate}"
