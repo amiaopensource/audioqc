@@ -116,14 +116,14 @@ class QcTarget
       if @mediainfo_out.general.extra.bext_present == 'Yes' && @mediainfo_out.general.encoded_library_settings
         signal_chain_count = @mediainfo_out.general.encoded_library_settings.scan(/A=/).count
         if @mediainfo_out.audio.channels == 1
-          unless @mediainfo_out.general.encoded_library_settings.scan(/mono/).count == signal_chain_count
+          unless @mediainfo_out.general.encoded_library_settings.scan(/mono/i).count == signal_chain_count
             @enc_hist_error << "BEXT Coding History channels don't match file"
           end
         end
 
         if @mediainfo_out.audio.channels == 2
-          stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/).count
-          dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/).count
+          stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/i).count
+          dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/i).count
           unless stereo_count + dual_count == signal_chain_count
             @enc_hist_error << "BEXT Coding History channels don't match file"
           end
