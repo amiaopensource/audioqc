@@ -214,7 +214,7 @@ file_inputs.each do |fileinput|
   if options.include? 'signal'
    target.get_ffprobe
    target.find_peaks_n_phase
-   target.check_dropouts
+   # target.check_dropouts
  end
   if options.include? 'quiet'
     if target.output_warnings.empty?
