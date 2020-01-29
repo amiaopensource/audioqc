@@ -14,7 +14,7 @@ require 'mediainfo'
 options = []
 ARGV.options do |opts|
   opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
-  opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val }
+  opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val.downcase }
   opts.on('-q', '--Quiet') { options << 'quiet' }
   opts.on('-m', '--meta-scan') { options << 'meta' }
   opts.on('-s', '--signal-scan') { options << 'signal' }
@@ -69,10 +69,12 @@ mc_policy = <<~EOS
 EOS
 # End embedded WAV Mediaconch policy section
 
-unless defined? POLICY_FILE
-  POLICY_FILE = Tempfile.new('mediaConch')
-  POLICY_FILE.write(mc_policy)
-  POLICY_FILE.rewind
+if TARGET_EXTENSION == 'wav'
+  unless defined? POLICY_FILE
+    POLICY_FILE = Tempfile.new('mediaConch')
+    POLICY_FILE.write(mc_policy)
+    POLICY_FILE.rewind
+  end
 end
 
 class QcTarget
@@ -90,10 +92,12 @@ class QcTarget
     media_conch_out.strip!
     media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
     @qc_results = @qc_results.to_s
-    if @qc_results.include?('pass!')
-      @qc_results = 'PASS'
-    else
-      @warnings << 'MEDIACONCH FAIL'
+    if File.exist?(policy)
+      if @qc_results.include?('pass!')
+        @qc_results = 'PASS'
+      else
+        @warnings << 'MEDIACONCH FAIL'
+      end
     end
   end
 
@@ -115,28 +119,30 @@ class QcTarget
   end
 
   def qc_encoding_history
+    if TARGET_EXTENSION == 'wav'
     @enc_hist_error = []
-    unless @mediainfo_out.general.extra.nil?
-      if @mediainfo_out.general.extra.bext_present == 'Yes' && @mediainfo_out.general.encoded_library_settings
-        signal_chain_count = @mediainfo_out.general.encoded_library_settings.scan(/A=/).count
-        if @mediainfo_out.audio.channels == 1
-          unless @mediainfo_out.general.encoded_library_settings.scan(/mono/i).count == signal_chain_count
-            @enc_hist_error << "BEXT Coding History channels don't match file"
+      unless @mediainfo_out.general.extra.nil?
+        if @mediainfo_out.general.extra.bext_present == 'Yes' && @mediainfo_out.general.encoded_library_settings
+          signal_chain_count = @mediainfo_out.general.encoded_library_settings.scan(/A=/).count
+          if @mediainfo_out.audio.channels == 1
+            unless @mediainfo_out.general.encoded_library_settings.scan(/mono/i).count == signal_chain_count
+              @enc_hist_error << "BEXT Coding History channels don't match file"
+            end
           end
-        end
 
-        if @mediainfo_out.audio.channels == 2
-          stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/i).count
-          dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/i).count
-          unless stereo_count + dual_count == signal_chain_count
-            @enc_hist_error << "BEXT Coding History channels don't match file"
+          if @mediainfo_out.audio.channels == 2
+            stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/i).count
+            dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/i).count
+            unless stereo_count + dual_count == signal_chain_count
+              @enc_hist_error << "BEXT Coding History channels don't match file"
+            end
           end
         end
+      else
+        @enc_hist_error << "Encoding history not present"
       end
-    else
-      @enc_hist_error << "Encoding history not present"
+      @warnings << @enc_hist_error if @enc_hist_error.count > 0
     end
-    @warnings << @enc_hist_error if @enc_hist_error.count > 0
   end
 
   def check_dropouts
@@ -208,7 +214,9 @@ file_inputs.each do |fileinput|
   target = QcTarget.new(File.expand_path(fileinput))
   if options.include? 'meta'
     target.get_mediainfo
-    target.media_conch_scan(POLICY_FILE)
+    if defined? POLICY_FILE
+      target.media_conch_scan(POLICY_FILE)
+    end
     target.qc_encoding_history
   end
   if options.include? 'signal'
