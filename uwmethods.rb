@@ -127,16 +127,16 @@ class MediaObject < Sip
   def build_bext
     bext_data = grab_bext
     new_hist = bext_data[2] + "\nA=PCM,F=48000,W=24,M=#{get_channels},T=FFmpeg"
-    new_description = bext_data[0] + "-LOUDNESS NORMALIZED MEZZANINE"
+    new_description = bext_data[0] + "\nLOUDNESS NORMALIZED MEZZANINE"
     bext_meta_command = []
     bext_meta_command << "description=#{new_description}"
-    bext_meta_command << "originator=#{bext_data[3]}"
-    bext_meta_command << "originator_reference=#{bext_data[1]}"
+    bext_meta_command << "originator=#{bext_data[1]}"
+    bext_meta_command << "originator_reference=#{bext_data[3]}"
     bext_meta_command << "origination_date=#{get_date}"
     bext_meta_command << "origination_time=#{get_time}"
     bext_meta_command << "origination_time=#{get_time}"
     bext_meta_command << "coding_history=#{new_hist}"
-    bext_meta_command << "IARL=#{bext_data[3]}"
+    bext_meta_command << "IARL=#{bext_data[1]}"
     bext_meta_command.flat_map {|meta| ['-metadata', meta]}
   end
 
