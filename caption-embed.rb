@@ -33,6 +33,24 @@ def embedSubs(video,subPath)
 `ffmpeg -i "#{video}" -i "#{subPath}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif -scodec mov_text -metadata:s:s:0 language=eng "#{outputPath}"`
 end
 
+def makePlainText(video,subPath)
+  subs = File.readlines(subPath)
+  outputPath = getPaths(video)
+  plainText = []
+  subs.each do |line| 
+    if line.match(/([0-9])([0-9]):([0-9])([0-9]):([0-9])([0-9]).([0-9])([0-9])([0-9])/)
+      iterator = 1
+      until subs[subs.index(line) + iterator].strip.empty?
+        plainText << subs[subs.index(line) + iterator]
+        iterator += 1
+      end
+    end
+  end
+  File.open(outputPath + 'plain.txt', "w+") do |f|
+    f.puts(plainText)
+  end
+end
+
 # Gather inputs 
 ARGV.each do |input|
   inputs << input if File.file?(input)
@@ -58,5 +76,9 @@ inputs.each {|target| checkMime(target)}
   if options.include?('embed')
     embedSubs(video,subPath)
   end
+  if options.empty?
+    embedSubs(video,subPath)
+  end
+  makePlainText(video,subPath)
 end
   
