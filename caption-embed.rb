@@ -25,7 +25,7 @@ end
 
 def burnSubs(video,subPath)
   outputPath = getPaths(video) + '_burntsubs.mp4'
-  `ffmpeg -i "#{video}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif,subtitles="#{subPath}" "#{outputPath}"`
+  `ffmpeg -i "#{video}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif,subtitles="#{subPath.gsub(',','\\,')}" "#{outputPath}"`
 end
 
 def embedSubs(video,subPath)
