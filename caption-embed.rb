@@ -19,6 +19,12 @@ end
 @subTargets = []
 inputs = []
 
+if osType == 'windows'
+  ffmpegPath = "#{__dir__}/ffmpeg.exe"
+else
+  ffmpegPath = 'ffmpeg'
+end
+
 def checkMime(targetFile)
   if osType == 'windows'
     if File.extname.downcase == '.vtt' || File.extname.downcase == '.srt'
@@ -39,12 +45,12 @@ end
 
 def burnSubs(video,subPath)
   outputPath = getPaths(video) + '_burntsubs.mp4'
-  `ffmpeg -i "#{video}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif,subtitles="#{subPath.gsub(',','\\,')}" "#{outputPath}"`
+  `#{ffmpegPath} -i "#{video}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif,subtitles="#{subPath.gsub(',','\\,')}" "#{outputPath}"`
 end
 
 def embedSubs(video,subPath)
   outputPath = getPaths(video) + '_embedsubs.mp4'
-`ffmpeg -i "#{video}" -i "#{subPath}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif -scodec mov_text -metadata:s:s:0 language=eng "#{outputPath}"`
+`#{ffmpegPath} -i "#{video}" -i "#{subPath}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif -scodec mov_text -metadata:s:s:0 language=eng "#{outputPath}"`
 end
 
 def makePlainText(video,subPath)
