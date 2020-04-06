@@ -9,12 +9,26 @@ ARGV.options do |opts|
   opts.parse!
 end
 
+if RUBY_PLATFORM.includes?('mingw32')
+  osType = 'windows'
+else
+  osType = 'notwindows'
+end
+
 @vidTargets = []
 @subTargets = []
 inputs = []
 
 def checkMime(targetFile)
-  mimeType =  `file --b --mime-type "#{targetFile}"`.strip
+  if osType == 'windows'
+    if File.extname.downcase == '.vtt' || File.extname.downcase == '.srt'
+      mimeType = 'text/plain'
+    else
+      mimeType = 'video'
+    end
+  else
+    mimeType =  `file --b --mime-type "#{targetFile}"`.strip
+  end
   @subTargets << targetFile if mimeType == 'text/plain'
   @vidTargets << targetFile if mimeType.include?('video')
 end
