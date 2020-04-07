@@ -45,7 +45,7 @@ end
 
 def normalizePaths(path)
   pathNorm = path.gsub('\\','/')
-  pathNorm.gsub!(':','\\:')
+  pathNorm.gsub!('C:','C\\\\\\:')
   pathNorm.gsub!(',','\\,')
   File.path(pathNorm)
 end
@@ -87,7 +87,7 @@ end
 
 inputs.each {|target| checkMime(target)}
 @vidTargets.each do |video|
-  subPath = @subTargets.select {|x| File.basename(x,'.*') == File.basename(video,'.*')}
+  subPath = @subTargets.select {|x| File.basename(x,'.*').include?(File.basename(video,'.*'))}
 
   if subPath.length > 1
     subPath = @subTargets.select {|x| File.extname(x) == '.vtt' }
