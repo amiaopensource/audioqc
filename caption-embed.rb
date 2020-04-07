@@ -9,25 +9,25 @@ ARGV.options do |opts|
   opts.parse!
 end
 
-if RUBY_PLATFORM.includes?('mingw32')
-  osType = 'windows'
+if RUBY_PLATFORM.include?('mingw32')
+  OsType = 'windows'
 else
-  osType = 'notwindows'
+  OsType = 'notwindows'
 end
 
 @vidTargets = []
 @subTargets = []
 inputs = []
 
-if osType == 'windows'
-  ffmpegPath = "#{__dir__}/ffmpeg.exe"
+if OsType == 'windows'
+  FfmpegPath = "#{__dir__}/ffmpeg.exe"
 else
-  ffmpegPath = 'ffmpeg'
+  FfmpegPath = 'ffmpeg'
 end
 
 def checkMime(targetFile)
-  if osType == 'windows'
-    if File.extname.downcase == '.vtt' || File.extname.downcase == '.srt'
+  if OsType == 'windows'
+    if File.extname(targetFile).downcase == '.vtt' || File.extname(targetFile).downcase == '.srt'
       mimeType = 'text/plain'
     else
       mimeType = 'video'
@@ -43,14 +43,22 @@ def getPaths(video)
   outputPath = File.dirname(video) + '/' + File.basename(video,".*")
 end
 
+def normalizePaths(path)
+  pathNorm = path.gsub('\\','/')
+  pathNorm.gsub!(':','\\:')
+  pathNorm.gsub!(',','\\,')
+  File.path(pathNorm)
+end
+
 def burnSubs(video,subPath)
   outputPath = getPaths(video) + '_burntsubs.mp4'
-  `#{ffmpegPath} -i "#{video}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif,subtitles="#{subPath.gsub(',','\\,')}" "#{outputPath}"`
+  subPath = normalizePaths(subPath)
+  `"#{FfmpegPath}" -i "#{File.path(video)}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif,subtitles="#{File.path(subPath)}" "#{outputPath}"`
 end
 
 def embedSubs(video,subPath)
   outputPath = getPaths(video) + '_embedsubs.mp4'
-`#{ffmpegPath} -i "#{video}" -i "#{subPath}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif -scodec mov_text -metadata:s:s:0 language=eng "#{outputPath}"`
+`"#{FfmpegPath}" -i "#{File.path(video)}" -i "#{File.path(subPath)}" -c:v libx264 -pix_fmt yuv420p -c:a aac -crf 25 -movflags +faststart -vf yadif -scodec mov_text -metadata:s:s:0 language=eng "#{outputPath}"`
 end
 
 def makePlainText(video,subPath)
