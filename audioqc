@@ -7,6 +7,7 @@ require 'csv'
 require 'optparse'
 require 'mediainfo'
 
+
 # This controls option flags
 # -p option allows you to select a custom mediaconch policy file - otherwise script uses default
 # -e allows you to select a target file extenstion for the script to use.
@@ -17,11 +18,12 @@ ARGV.options do |opts|
   opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val.downcase }
   opts.on('-q', '--Quiet') { options << 'quiet' }
   opts.on('-m', '--meta-scan') { options << 'meta' }
+  opts.on('-b', '--bext-scan') { options << 'bext' }
   opts.on('-s', '--signal-scan') { options << 'signal' }
   opts.parse!
 end
 
-options += ['signal', 'meta'] unless (options & ['meta', 'signal']).any?
+options += ['signal', 'meta'] unless (options & ['meta', 'signal', 'bext']).any?
 
 # set up arrays and variables
 TARGET_EXTENSION = 'wav' unless defined? TARGET_EXTENSION
@@ -212,11 +214,13 @@ end
 
 file_inputs.each do |fileinput|
   target = QcTarget.new(File.expand_path(fileinput))
+  target.get_mediainfo
   if options.include? 'meta'
-    target.get_mediainfo
     if defined? POLICY_FILE
       target.media_conch_scan(POLICY_FILE)
     end
+  end
+  if options.include? 'bext'
     target.qc_encoding_history
   end
   if options.include? 'signal'
