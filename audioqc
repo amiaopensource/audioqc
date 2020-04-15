@@ -20,6 +20,7 @@ ARGV.options do |opts|
   opts.on('-m', '--meta-scan') { options << 'meta' }
   opts.on('-b', '--bext-scan') { options << 'bext' }
   opts.on('-s', '--signal-scan') { options << 'signal' }
+  opts.on('-d', '--dropout-scan') { options << 'dropouts' }
   opts.parse!
 end
 
@@ -148,7 +149,11 @@ class QcTarget
   end
 
   def check_dropouts
+    @sample_ratios = []
     @possible_drops = []
+    @ffprobe_out['frames'].each do |frames|
+      @sample_ratios << frames['tags']['lavfi.astats.Overall.Max_difference'].to_f / frames['tags']['lavfi.astats.Overall.Mean_difference'].to_f
+    end
     @sample_ratios.each_with_index do |ratio, i|
       unless i + 1 == @sample_ratios.length
         diff_prior = (ratio - @sample_ratios[i - 1]).abs
@@ -164,7 +169,6 @@ class QcTarget
   def find_peaks_n_phase
     high_db_frames = []
     out_of_phase_frames = []
-    @sample_ratios = []
     @levels = []
     @ffprobe_out['frames'].each do |frames|
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
@@ -172,7 +176,6 @@ class QcTarget
       out_of_phase_frames << audiophase if audiophase < -0.25
       high_db_frames << peaklevel if peaklevel > -2.0
       @levels << peaklevel
-      @sample_ratios << frames['tags']['lavfi.astats.Overall.Max_difference'].to_f / frames['tags']['lavfi.astats.Overall.Mean_difference'].to_f
     end
     @max_level = @levels.max
     @high_level_count = high_db_frames.count
@@ -226,7 +229,7 @@ file_inputs.each do |fileinput|
   if options.include? 'signal'
    target.get_ffprobe
    target.find_peaks_n_phase
-   # target.check_dropouts
+   target.check_dropouts
  end
   if options.include? 'quiet'
     if target.output_warnings.empty?
