@@ -21,6 +21,7 @@ ARGV.options do |opts|
   opts.on('-b', '--bext-scan') { options << 'bext' }
   opts.on('-s', '--signal-scan') { options << 'signal' }
   opts.on('-d', '--dropout-scan') { options << 'dropouts' }
+  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts'] }
   opts.parse!
 end
 
@@ -196,10 +197,7 @@ class QcTarget
       line << @possible_drops
     end
     if options.include? 'signal'
-      line << @max_level
-      line << @high_level_count
-      line << @average_phase
-      line << @phasey_frame_count
+      line += [@max_level,  @high_level_count, @average_phase, @phasey_frame_count]
     end
     if options.include? 'meta'
       line << @qc_results
@@ -280,10 +278,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include? 'signal'
-   headers << 'Peak Level'
-   headers << 'Number of Frames w/ High Levels'
-   headers << 'Average Phase'
-   headers << 'Number of Phase Warnings'
+   headers += ['Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings']
   end
 
   if options.include? 'meta'
