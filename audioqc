@@ -113,7 +113,7 @@ class QcTarget
   def get_ffprobe
     ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + @input_path + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
     @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
-    @total_frame_count = @ffprobe_out['frames'].count
+    @total_frame_count = @ffprobe_out['frames'].size
   end
 
   def normalize_time(time_source)
@@ -148,7 +148,7 @@ class QcTarget
       else
         @enc_hist_error << "Encoding history not present"
       end
-      @warnings << @enc_hist_error if @enc_hist_error.count > 0
+      @warnings << @enc_hist_error if @enc_hist_error.size > 0
     end
   end
 
@@ -173,17 +173,20 @@ class QcTarget
   def find_peaks_n_phase
     high_db_frames = []
     out_of_phase_frames = []
+    phase_frames = []
     @levels = []
     @ffprobe_out['frames'].each do |frames|
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
+      phase_frames << audiophase
       out_of_phase_frames << audiophase if audiophase < -0.25
       high_db_frames << peaklevel if peaklevel > -2.0
       @levels << peaklevel
     end
     @max_level = @levels.max
-    @high_level_count = high_db_frames.count
-    @phasey_frame_count = out_of_phase_frames.count
+    @high_level_count = high_db_frames.size
+    @phasey_frame_count = out_of_phase_frames.size
+    @average_phase = phase_frames.sum(0.0) / phase_frames.size
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
@@ -195,6 +198,7 @@ class QcTarget
     if options.include? 'signal'
       line << @max_level
       line << @high_level_count
+      line << @average_phase
       line << @phasey_frame_count
     end
     if options.include? 'meta'
@@ -278,6 +282,7 @@ CSV.open(output_csv, 'wb') do |csv|
   if options.include? 'signal'
    headers << 'Peak Level'
    headers << 'Number of Frames w/ High Levels'
+   headers << 'Average Phase'
    headers << 'Number of Phase Warnings'
   end
 
