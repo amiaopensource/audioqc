@@ -24,7 +24,7 @@ ARGV.options do |opts|
   opts.parse!
 end
 
-options += ['signal', 'meta'] unless (options & ['meta', 'signal', 'bext']).any?
+options += ['signal', 'meta'] if (options - ['quiet']).empty?
 
 # set up arrays and variables
 TARGET_EXTENSION = 'wav' unless defined? TARGET_EXTENSION
@@ -88,19 +88,23 @@ class QcTarget
 
   # Function to scan file for mediaconch compliance
   def media_conch_scan(policy)
-    @qc_results = []
-    policy_path = File.path(policy)
-    command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
-    media_conch_out = `#{command}`
-    media_conch_out.strip!
-    media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
-    @qc_results = @qc_results.to_s
-    if File.exist?(policy)
-      if @qc_results.include?('pass!')
-        @qc_results = 'PASS'
-      else
-        @warnings << 'MEDIACONCH FAIL'
+    if File.file?(policy)
+      @qc_results = []
+      policy_path = File.path(policy)
+      command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
+      media_conch_out = `#{command}`
+      media_conch_out.strip!
+      media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
+      @qc_results = @qc_results.to_s
+      if File.exist?(policy)
+        if @qc_results.include?('pass!')
+          @qc_results = 'PASS'
+        else
+          @warnings << 'MEDIACONCH FAIL'
+        end
       end
+    else
+      @qc_results = policy
     end
   end
 
@@ -183,9 +187,20 @@ class QcTarget
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
-
-  def output_csv_line
-    [@input_path, @warnings.flatten, @duration_normalized, @possible_drops, @max_level, @high_level_count, @phasey_frame_count, @qc_results]
+  def output_csv_line(options)
+    line = [@input_path, @warnings.flatten, @duration_normalized]
+    if options.include? 'dropouts'
+      line << @possible_drops
+    end
+    if options.include? 'signal'
+      line << @max_level
+      line << @high_level_count
+      line << @phasey_frame_count
+    end
+    if options.include? 'meta'
+      line << @qc_results
+    end
+  return line
   end
   def output_warnings
     @warnings
@@ -221,16 +236,22 @@ file_inputs.each do |fileinput|
   if options.include? 'meta'
     if defined? POLICY_FILE
       target.media_conch_scan(POLICY_FILE)
+    else
+      target.media_conch_scan('Valid Policy File Not Found')
     end
   end
   if options.include? 'bext'
     target.qc_encoding_history
   end
-  if options.include? 'signal'
-   target.get_ffprobe
-   target.find_peaks_n_phase
-   target.check_dropouts
- end
+  if options.include?('signal') || options.include?('dropouts')
+    target.get_ffprobe
+    if options.include? 'signal'
+      target.find_peaks_n_phase
+    end
+    if options.include? 'dropouts'
+      target.check_dropouts
+    end
+  end
   if options.include? 'quiet'
     if target.output_warnings.empty?
       puts 'QC Pass!'
@@ -241,7 +262,7 @@ file_inputs.each do |fileinput|
       exit 1
     end
   else
-    write_to_csv << target.output_csv_line
+    write_to_csv << target.output_csv_line(options)
   end
 end
 
@@ -249,7 +270,20 @@ timestamp = Time.now.strftime('%Y-%m-%d_%H-%M-%S')
 output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
 
 CSV.open(output_csv, 'wb') do |csv|
-  headers = ['Filename', 'Warnings', 'Duration', 'Possible Drops', 'Peak Level', 'Number of Frames w/ High Levels', 'Number of Phase Warnings', 'MediaConch Policy Compliance']
+  headers = ['Filename', 'Warnings', 'Duration']
+  if options.include? 'dropouts'
+    headers << 'Possible Drops'
+  end
+
+  if options.include? 'signal'
+   headers << 'Peak Level'
+   headers << 'Number of Frames w/ High Levels'
+   headers << 'Number of Phase Warnings'
+  end
+
+  if options.include? 'meta'
+    headers <<  'MediaConch Policy Compliance'
+  end
   csv << headers
   write_to_csv.each do |line|
     csv << line
