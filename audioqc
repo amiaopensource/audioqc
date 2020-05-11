@@ -5,7 +5,12 @@ require 'json'
 require 'tempfile'
 require 'csv'
 require 'optparse'
-require 'mediainfo'
+if system("gem list mediainfo -i > /dev/null")
+  require 'mediainfo'
+else
+  puts "Required gem Mediainfo not found. Please install with: sudo gem install mediainfo"
+  exit
+end
 
 
 # This controls option flags
