@@ -6,12 +6,14 @@ require 'mediainfo'
 require 'optparse'
 
 InputItemNumbers = []
+Skip = []
 HuskyLinks = ['https://web.archive.org/web/20090820093233/http://geocities.com/aleharobed/siberian_husky_run_mini.gif',
 'https://web.archive.org/web/20090829072442/http://www.geocities.com/sakiaakennelz/walkingsiberianhusky.gif',
 'https://web.archive.org/web/20091019155615/http://de.geocities.com/Mausezwerg1981/huskyspringend.gif']
 
 ARGV.options do |opts|
   opts.on("-i", "--item-number=val", String)  { |val| InputItemNumbers << val }
+  opts.on("-s" "--skip=val", String) { |val| Skip << val }
   opts.parse!
 end
 
@@ -62,14 +64,14 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
   end
   command << 'bwfmetaedit' 
   command << '--reject-overwrite'
-  command << "--Originator=#{origin}"
-  command << "--Description=#{description}"
-  command << "--OriginatorReference=#{originator_reference}"
-  command << "--History=#{history}"
-  command << "--IARL=#{origin}"
-  command << "--OriginationDate=#{moddate}"
-  command << "--OriginationTime=#{modtime}"
-  command << '--MD5-Embed'
+  command << "--Originator=#{origin}" unless Skip.include?('Originator')
+  command << "--Description=#{description}" unless Skip.include?('Description')
+  command << "--OriginatorReference=#{originator_reference}" unless Skip.include?('OriginatorReference')
+  command << "--History=#{history}" unless Skip.include?('History')
+  command << "--IARL=#{origin}" unless Skip.include?('IARL')
+  command << "--OriginationDate=#{moddate}" unless Skip.include?('OriginationDate')
+  command << "--OriginationTime=#{modtime}" unless Skip.include?('OriginationTime')
+  command << '--MD5-Embed' unless Skip.include?('MD5')
   command << "#{targetFile}"
   if system(*command) && Gui
     $window.alert("Embedding done")
