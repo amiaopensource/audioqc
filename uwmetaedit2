@@ -13,7 +13,8 @@ HuskyLinks = ['https://web.archive.org/web/20090820093233/http://geocities.com/a
 
 ARGV.options do |opts|
   opts.on("-i", "--item-number=val", String)  { |val| InputItemNumbers << val }
-  opts.on("-s" "--skip=val", String) { |val| Skip << val }
+  opts.on("-s", "--skip=val", String) { |val| Skip << val }
+  opts.on("-o", "--overwrite") { Overwrite = true }
   opts.parse!
 end
 
@@ -63,7 +64,7 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
     description = "Collection number: #{collNumber}, " + "Original File Name #{File.basename(targetFile,".*")}"
   end
   command << 'bwfmetaedit' 
-  command << '--reject-overwrite'
+  command << '--reject-overwrite' unless Overwrite
   command << "--Originator=#{origin}" unless Skip.include?('Originator')
   command << "--Description=#{description}" unless Skip.include?('Description')
   command << "--OriginatorReference=#{originator_reference}" unless Skip.include?('OriginatorReference')
