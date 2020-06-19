@@ -189,10 +189,11 @@ class QcTarget
       high_db_frames << peaklevel if peaklevel > -2.0
       @levels << peaklevel
     end
-    @max_level = @levels.max
+    @max_level = @levels.max.round(2)
     @high_level_count = high_db_frames.size
+    @average_levels = (@levels.sum(0.0) / @levels.size).round(2)
     @phasey_frame_count = out_of_phase_frames.size
-    @average_phase = phase_frames.sum(0.0) / phase_frames.size
+    @average_phase = (phase_frames.sum(0.0) / phase_frames.size).round(2)
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
@@ -202,12 +203,12 @@ class QcTarget
       line << @possible_drops
     end
     if options.include? 'signal'
-      line += [@max_level,  @high_level_count, @average_phase, @phasey_frame_count]
+      line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count]
     end
     if options.include? 'meta'
       line << @qc_results
     end
-  return line
+    return line
   end
   def output_warnings
     @warnings
@@ -283,7 +284,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include? 'signal'
-   headers += ['Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings']
+   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings']
   end
 
   if options.include? 'meta'
