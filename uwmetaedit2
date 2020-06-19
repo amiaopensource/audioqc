@@ -57,7 +57,7 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
   modtime = moddatetime.strftime("%H:%M:%S")
   history = codeHist1 + "\n" + codeHist2
   originator_reference = File.basename(targetFile)
-  originator_reference = 'See description for identifiers' if originator_reference.length > 36
+  originator_reference = 'See description for identifiers' if originator_reference.length > 32
   unless itemNumber.nil?
     description = "Collection number: #{collNumber}, " + "Item Number: #{itemNumber}, " + "Original File Name: #{File.basename(targetFile,".*")}"
   else
