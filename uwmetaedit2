@@ -33,6 +33,7 @@ unless File.exist?(configPath)
     "originator" =>'',
     "history1" => '',
     "history2" => '',
+    "history3" => '',
     "collection" => ''
   }
   File.open(configPath, "w") { |file| file.write(configBlank.to_yaml) }
@@ -50,12 +51,13 @@ def getOutputDir()
 end
 
 
-def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
+def embedBext(targetFile, origin, codeHist1, codeHist2, codeHist3,collNumber, itemNumber)
   command = []
   moddatetime = File.mtime(targetFile)
   moddate = moddatetime.strftime("%Y-%m-%d")
   modtime = moddatetime.strftime("%H:%M:%S")
   history = codeHist1 + "\n" + codeHist2
+  history += "\n" + codeHist3 unless codeHist3.empty?
   originator_reference = File.basename(targetFile)
   originator_reference = 'See description for identifiers' if originator_reference.length > 32
   unless itemNumber.nil?
@@ -63,6 +65,7 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, collNumber, itemNumber)
   else
     description = "Collection number: #{collNumber}, " + "Original File Name #{File.basename(targetFile,".*")}"
   end
+  description += "\nPROCESSED MEZZANINE FILE" unless codeHist3.empty? 
   command << 'bwfmetaedit' 
   command << '--reject-overwrite' unless Overwrite
   command << "--Originator=#{origin}" unless Skip.include?('Originator')
@@ -86,6 +89,7 @@ end
 originator = configOptions['originator']
 history1 = configOptions['history1']
 history2 = configOptions['history2']
+history3 = configOptions['history3']
 collection = configOptions['collection']
 
 unless ARGV.length.positive?
@@ -101,10 +105,12 @@ unless ARGV.length.positive?
   origin = $window.pane("BEXT").input('Originator', options = {value:originator})
   codeHist1 = $window.pane("BEXT").input('Encoding History Line 1' , options = {value:history1})
   codeHist2 = $window.pane("BEXT").input('Encoding History Line 2', options = {value:history2})
+  codeHist3 = $window.pane("BEXT").input('Mezzanine creation information)', options = {value:history3})
     $window.pane("Controls").button("Save Settings") {
     configOptions['originator'] = origin.to_s
     configOptions['history1'] = codeHist1.to_s
     configOptions['history2'] = codeHist2.to_s
+    configOptions['history3'] = codeHist3.to_s
     configOptions['collection'] = collNumber.to_s
     File.open(configPath, "w") { |file| file.write(configOptions.to_yaml) }
    }
@@ -121,7 +127,7 @@ else
   ARGV.each do |targetFile|
     itemNumber = InputItemNumbers[ARGV.index(targetFile)]
     if File.exist?(targetFile)
-      embedBext(targetFile, originator, history1, history2, collection, itemNumber)
+      embedBext(targetFile, originator, history1, history2, history3, collection, itemNumber)
     else
       puts "File not found: Skipping #{targetFile}"
     end
