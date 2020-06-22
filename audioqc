@@ -68,6 +68,9 @@ mc_policy = <<~EOS
     <policy type="and" name="Is BFW?">
       <rule name="BEXT Exist?" value="Wave/Broadcast extension/" occurrence="*" operator="exists" scope="mmt"/>
     </policy>
+    <policy type="and" name="Is BFW?">
+      <rule name="No Padding" value="Wave/JUNK/" occurrence="*" operator="must not exist" scope="mmt"/>
+    </policy>
     <policy type="and" name="Valid File Size?">
       <rule name="Size Limit" value="FileSize" tracktype="General" occurrence="*" operator="&lt;">4000000000</rule>
     </policy>
