@@ -68,9 +68,6 @@ mc_policy = <<~EOS
     <policy type="and" name="Is BFW?">
       <rule name="BEXT Exist?" value="Wave/Broadcast extension/" occurrence="*" operator="exists" scope="mmt"/>
     </policy>
-    <policy type="and" name="Is BFW?">
-      <rule name="No Padding" value="Wave/JUNK/" occurrence="*" operator="must not exist" scope="mmt"/>
-    </policy>
     <policy type="and" name="Valid File Size?">
       <rule name="Size Limit" value="FileSize" tracktype="General" occurrence="*" operator="&lt;">4000000000</rule>
     </policy>
@@ -161,6 +158,12 @@ class QcTarget
     end
   end
 
+  def check_metaedit
+    scan_output = `bwfmetaedit "#{@input_path}" 2>&1`.chomp.chomp
+    @wave_conformance = scan_output.split(':').last.strip if scan_output.include?('invalid')
+    @warnings << "Invalid Wave Detected" if @wave_conformance.length > 0 
+  end
+
   def check_dropouts
     @sample_ratios = []
     @possible_drops = []
@@ -209,7 +212,7 @@ class QcTarget
       line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count]
     end
     if options.include? 'meta'
-      line << @qc_results
+      line += [@wave_conformance, @qc_results]
     end
     return line
   end
@@ -250,6 +253,7 @@ file_inputs.each do |fileinput|
     else
       target.media_conch_scan('Valid Policy File Not Found')
     end
+    target.check_metaedit
   end
   if options.include? 'bext'
     target.qc_encoding_history
@@ -291,6 +295,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include? 'meta'
+    headers << 'Wave Confomance Errors'
     headers <<  'MediaConch Policy Compliance'
   end
   csv << headers
