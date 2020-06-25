@@ -168,7 +168,7 @@ class QcTarget
   def check_metaedit
     scan_output = `bwfmetaedit "#{@input_path}" 2>&1`.chomp.chomp
     @wave_conformance = scan_output.split(':').last.strip if scan_output.include?('invalid')
-    @warnings << "Invalid Wave Detected" if @wave_conformance.length > 0 
+    @warnings << "Invalid Wave Detected" unless @wave_conformance.nil?
   end
 
   def check_dropouts
