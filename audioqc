@@ -12,6 +12,13 @@ else
   exit
 end
 
+dependencies = ['bwfmetaedit', 'ffprobe', 'mediaconch']
+missing_dependencies = []
+dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
+if missing_dependencies.length > 0
+  missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
+  exit
+end
 
 # This controls option flags
 # -p option allows you to select a custom mediaconch policy file - otherwise script uses default
