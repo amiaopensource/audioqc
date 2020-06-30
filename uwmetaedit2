@@ -67,7 +67,7 @@ def embedBext(targetFile, origin, codeHist1, codeHist2, codeHist3,collNumber, it
   end
   description += "\nPROCESSED MEZZANINE FILE" unless codeHist3.empty? 
   command << 'bwfmetaedit' 
-  command << '--reject-overwrite' unless Overwrite
+  command << '--reject-overwrite' if defined?(Overwrite).nil?
   command << "--Originator=#{origin}" unless Skip.include?('Originator')
   command << "--Description=#{description}" unless Skip.include?('Description')
   command << "--OriginatorReference=#{originator_reference}" unless Skip.include?('OriginatorReference')
