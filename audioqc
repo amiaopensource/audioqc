@@ -72,7 +72,7 @@ mc_policy = <<~EOS
         <!-- <rule name="Audio is 8 bit?" value="BitDepth" tracktype="Audio" occurrence="*" operator="=">8</rule> -->
       </policy>
     </policy>
-    <policy type="and" name="Is BFW?">
+    <policy type="and" name="Is BWF?">
       <rule name="BEXT Exist?" value="Wave/Broadcast extension/" occurrence="*" operator="exists" scope="mmt"/>
     </policy>
     <policy type="and" name="Valid File Size?">
@@ -211,7 +211,7 @@ class QcTarget
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
   def output_csv_line(options)
-    line = [@input_path, @warnings.flatten, @duration_normalized]
+    line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
     if options.include? 'dropouts'
       line << @possible_drops
     end
