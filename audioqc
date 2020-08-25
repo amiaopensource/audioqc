@@ -5,12 +5,7 @@ require 'json'
 require 'tempfile'
 require 'csv'
 require 'optparse'
-if system("gem list mediainfo -i > /dev/null")
-  require 'mediainfo'
-else
-  puts "Required gem Mediainfo not found. Please install with: sudo gem install mediainfo"
-  exit
-end
+require 'json'
 
 dependencies = ['bwfmetaedit', 'ffprobe', 'mediaconch']
 missing_dependencies = []
@@ -134,25 +129,25 @@ class QcTarget
   end
 
   def get_mediainfo
-    @mediainfo_out = MediaInfo.from(@input_path)
-    @duration_normalized = Time.at(@mediainfo_out.audio.duration / 1000).utc.strftime('%H:%M:%S')
+    @mediainfo_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
+    @duration_normalized = Time.at(@mediainfo_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
   end
 
   def qc_encoding_history
     if TARGET_EXTENSION == 'wav'
     @enc_hist_error = []
-      unless @mediainfo_out.general.extra.nil?
-        if @mediainfo_out.general.extra.bext_present == 'Yes' && @mediainfo_out.general.encoded_library_settings
-          signal_chain_count = @mediainfo_out.general.encoded_library_settings.scan(/A=/).count
-          if @mediainfo_out.audio.channels == 1
-            unless @mediainfo_out.general.encoded_library_settings.scan(/mono/i).count == signal_chain_count
+      unless @mediainfo_out['media']['track'][0]['extra'].nil?
+        if  @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+          signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
+          if @mediainfo_out['media']['track'][1]['Channels'] == "1"
+            unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
           end
 
-          if @mediainfo_out.audio.channels == 2
-            stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/i).count
-            dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/i).count
+          if @mediainfo_out['media']['track'][1]['Channels'] == "2"
+            stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+            dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
             unless stereo_count + dual_count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
@@ -182,7 +177,7 @@ class QcTarget
         diff_prior = (ratio - @sample_ratios[i - 1]).abs
         diff_post = (ratio - @sample_ratios[i + 1]).abs
         if diff_prior > 15 && diff_post > 15
-          @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out.audio.samplingrate) 
+          @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out['media']['track'][1]['SamplingRate'].to_f) 
         end
       end
     end
