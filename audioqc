@@ -128,7 +128,7 @@ class QcTarget
   # Functions to scan audio stream characteristics
   # Function to get ffprobe json info
   def get_ffprobe
-    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + @input_path + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
+    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
     @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
     @total_frame_count = @ffprobe_out['frames'].size
   end
