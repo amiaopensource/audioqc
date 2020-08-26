@@ -236,15 +236,15 @@ end
 file_inputs = []
 write_to_csv = []
 ARGV.each do |input|
-  input.gsub!('\\','/')
+  input_normalized = input.gsub('\\','/')
   # If input is directory, recursively add all files with target extension to target list
-  if File.directory?(input)
-    targets = Dir["#{input}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
+  if File.directory?(input_normalized)
+    targets = Dir["#{input_normalized}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
     targets.each do |file|
       file_inputs << file
     end
   # If input is file, add it to target list (if extension matches target extension)
-  elsif File.extname(input).downcase == '.' + TARGET_EXTENSION.downcase && File.exist?(input)
+  elsif File.extname(input_normalized).downcase == '.' + TARGET_EXTENSION.downcase && File.exist?(input)
     file_inputs << input
   else
     puts "Input: #{input} not found!"
