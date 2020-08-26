@@ -7,12 +7,21 @@ require 'csv'
 require 'optparse'
 require 'json'
 
+if Gem::Platform.local.os == 'mingw32'
+  System = 'windows'
+else
+  System = 'not-windows'
+end
+
+
 dependencies = ['bwfmetaedit', 'ffprobe', 'mediaconch']
 missing_dependencies = []
-dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
-if missing_dependencies.length > 0
-  missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
-  exit
+if System == 'not-windows'
+  dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
+  if missing_dependencies.length > 0
+    missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
+    exit
+  end
 end
 
 # This controls option flags
@@ -227,6 +236,7 @@ end
 file_inputs = []
 write_to_csv = []
 ARGV.each do |input|
+  input.gsub!('\\','/')
   # If input is directory, recursively add all files with target extension to target list
   if File.directory?(input)
     targets = Dir["#{input}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
