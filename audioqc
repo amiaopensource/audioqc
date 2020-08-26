@@ -5,19 +5,23 @@ require 'json'
 require 'tempfile'
 require 'csv'
 require 'optparse'
-if system("gem list mediainfo -i > /dev/null")
-  require 'mediainfo'
+require 'json'
+
+if Gem::Platform.local.os == 'mingw32'
+  System = 'windows'
 else
-  puts "Required gem Mediainfo not found. Please install with: sudo gem install mediainfo"
-  exit
+  System = 'not-windows'
 end
+
 
 dependencies = ['bwfmetaedit', 'ffprobe', 'mediaconch']
 missing_dependencies = []
-dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
-if missing_dependencies.length > 0
-  missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
-  exit
+if System == 'not-windows'
+  dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
+  if missing_dependencies.length > 0
+    missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
+    exit
+  end
 end
 
 # This controls option flags
@@ -124,7 +128,7 @@ class QcTarget
   # Functions to scan audio stream characteristics
   # Function to get ffprobe json info
   def get_ffprobe
-    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + @input_path + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
+    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
     @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
     @total_frame_count = @ffprobe_out['frames'].size
   end
@@ -134,25 +138,25 @@ class QcTarget
   end
 
   def get_mediainfo
-    @mediainfo_out = MediaInfo.from(@input_path)
-    @duration_normalized = Time.at(@mediainfo_out.audio.duration / 1000).utc.strftime('%H:%M:%S')
+    @mediainfo_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
+    @duration_normalized = Time.at(@mediainfo_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
   end
 
   def qc_encoding_history
     if TARGET_EXTENSION == 'wav'
     @enc_hist_error = []
-      unless @mediainfo_out.general.extra.nil?
-        if @mediainfo_out.general.extra.bext_present == 'Yes' && @mediainfo_out.general.encoded_library_settings
-          signal_chain_count = @mediainfo_out.general.encoded_library_settings.scan(/A=/).count
-          if @mediainfo_out.audio.channels == 1
-            unless @mediainfo_out.general.encoded_library_settings.scan(/mono/i).count == signal_chain_count
+      unless @mediainfo_out['media']['track'][0]['extra'].nil?
+        if  @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+          signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
+          if @mediainfo_out['media']['track'][1]['Channels'] == "1"
+            unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
           end
 
-          if @mediainfo_out.audio.channels == 2
-            stereo_count = @mediainfo_out.general.encoded_library_settings.scan(/stereo/i).count
-            dual_count = @mediainfo_out.general.encoded_library_settings.scan(/dual/i).count
+          if @mediainfo_out['media']['track'][1]['Channels'] == "2"
+            stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+            dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
             unless stereo_count + dual_count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
@@ -182,7 +186,7 @@ class QcTarget
         diff_prior = (ratio - @sample_ratios[i - 1]).abs
         diff_post = (ratio - @sample_ratios[i + 1]).abs
         if diff_prior > 15 && diff_post > 15
-          @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out.audio.samplingrate) 
+          @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out['media']['track'][1]['SamplingRate'].to_f) 
         end
       end
     end
@@ -232,14 +236,15 @@ end
 file_inputs = []
 write_to_csv = []
 ARGV.each do |input|
+  input_normalized = input.gsub('\\','/')
   # If input is directory, recursively add all files with target extension to target list
-  if File.directory?(input)
-    targets = Dir["#{input}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
+  if File.directory?(input_normalized)
+    targets = Dir["#{input_normalized}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
     targets.each do |file|
       file_inputs << file
     end
   # If input is file, add it to target list (if extension matches target extension)
-  elsif File.extname(input).downcase == '.' + TARGET_EXTENSION.downcase && File.exist?(input)
+  elsif File.extname(input_normalized).downcase == '.' + TARGET_EXTENSION.downcase && File.exist?(input)
     file_inputs << input
   else
     puts "Input: #{input} not found!"
