@@ -1,10 +1,14 @@
 # audioqc
 
-## audioqc
+Depends on: FFprobe, Mediaconch, Media Info, BWF Metaedit, Ruby
 
-Depends on: FFprobe, Mediaconch, Media Info
+## Set-up
 
-Needed Gems: mediainfo
+Windows:
+* [Ruby](https://rubyinstaller.org/) will need to be installed if it isn't present already.
+* All dependencies will have to be added to the 'Path' and sholuld be the command line version (CLI) of their respective tools
+* Mediaconch, Media Info and BWF Metaedit can be downloaded from the [MediaArea](https://mediaarea.net/) website
+* FFprobe can be downloaded as part of the [FFmpeg package](https://ffmpeg.org/download.html#build-windows) 
 
 Usage:  `audioqc.rb [options] TARGET`
 
