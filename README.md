@@ -1,8 +1,19 @@
 # audioqc
 
-Depends on: FFprobe, Mediaconch, Media Info, BWF Metaedit, Ruby
+## About
+
+This script can target both directories and single audio files, and will generate audio quality control reports to the desktop. Different levels of reports are available through the use of different options. Available information includes:
+* Peak and average audio levels
+* Number of audio frames exceeding -2.0 dB
+* Average audio phase
+* Number of audio frames exceeding set limit for poor audio phase
+* Wave file conformance check (if input is Wave)
+* Scan of embedded coding history to check consistency with file characteristics (If input is BWF using CodingHistory field)
+* Mediaconch policy conformance check (default is for Wave - optional policy inputs are supported)
+* Locations of possible drop-outs (very experimental, suffers from many false positives at this point)
 
 ## Set-up
+Depends on: FFprobe, Mediaconch, Media Info, BWF Metaedit, Ruby
 
 ### Windows:
 * [Ruby](https://rubyinstaller.org/) will need to be installed if it isn't present already.
@@ -20,5 +31,3 @@ Usage:  `audioqc.rb [options] TARGET`
 * For the most up to date versions of Media Area dependencies it is recommended to activate the [MediaArea](https://mediaarea.net/en/Repos) repository
 
 Options: `-h` Help, ` -e` set target extension (for example `-e flac`). Default is wav. `-p` Override the built in mediaconch policy file with a custom file. `-p PATH-TO-POLICY-FILE`. `-q` Quiet mode - does not create CSV, just gives simple pass/fail in terminal. `-m` Scan file metadata (enabled by default). `-s` Scan file signal with ffprobe (enabled by default).
-
-This script can target both directories and single audio files, and will generate basic audio QC reports of to the desktop. Reports contain a warning for high levels, a warning for audio phase, and a Media Conch compliance check. Script has been tested on macOS and Linux.
