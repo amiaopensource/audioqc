@@ -6,7 +6,13 @@ require 'tempfile'
 require 'csv'
 require 'optparse'
 require 'json'
+require 'yaml'
 
+# Load config file
+config_file = "#{__dir__}/audioqc.config"
+Configurations = YAML.load(File.open(config_file).read)
+
+# Check system
 if Gem::Platform.local.os == 'mingw32'
   System = 'windows'
 else
@@ -44,7 +50,7 @@ end
 options += ['signal', 'meta'] if (options - ['quiet']).empty?
 
 # set up arrays and variables
-TARGET_EXTENSION = 'wav' unless defined? TARGET_EXTENSION
+TARGET_EXTENSION = Configurations['default_extension'] unless defined? TARGET_EXTENSION
 
 # Start embedded WAV Mediaconch policy section
 # Policy derived from MediaConch Public Policies. Original Maintainer Peter B. License: CC-BY-4.0+
@@ -202,8 +208,8 @@ class QcTarget
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
       phase_frames << audiophase
-      out_of_phase_frames << audiophase if audiophase < -0.25
-      high_db_frames << peaklevel if peaklevel > -2.0
+      out_of_phase_frames << audiophase if audiophase < Configurations['audio_phase_limit']
+      high_db_frames << peaklevel if peaklevel > Configurations['high_level_warning']
       @levels << peaklevel
     end
     @max_level = @levels.max.round(2)
@@ -214,6 +220,7 @@ class QcTarget
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
+
   def output_csv_line(options)
     line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
     if options.include? 'dropouts'
