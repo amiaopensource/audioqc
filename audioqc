@@ -314,7 +314,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include? 'meta'
-    headers << 'Wave Confomance Errors'
+    headers << 'Wave Conformance Errors'
     headers <<  'MediaConch Policy Compliance'
   end
   csv << headers
