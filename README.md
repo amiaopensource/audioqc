@@ -31,7 +31,7 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 
 ### Usage:
 `audioqc.rb [options] TARGET`
-This will result in a CSV output to your desktop. To change default settings, edit the values contained in the associated file `audioqc.config`
+This will result in a CSV output to your desktop. To change default settings, edit the values contained in the associated file `audioqc.config`.
 
 __NOTE 1:__ If no output settings are chosen, audioqc will run in with the equivalent of `-s` and `-m` enabled, for signal and technical metadata output.
 
@@ -53,6 +53,6 @@ Options:
 
 `-s` Scan file signal with ffprobe (enabled by default).
 
-`-b` Scan BEXT metadata for consistancy of CodingHistory field
+`-b` Scan BEXT metadata for consistency of CodingHistory field
 
 `-d` Scan file for audio dropouts (experimental!)
