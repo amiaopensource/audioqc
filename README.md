@@ -30,7 +30,8 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 * For the most up to date versions of MediaArea dependencies it is recommended to activate the [MediaArea](https://mediaarea.net/en/Repos) repository
 
 ### Usage:
-`Usage:  `audioqc.rb [options] TARGET`
+`audioqc.rb [options] TARGET`
+This will result in a CSV output to your desktop. To change default settings, edit the values contained in the associated file `audioqc.config`
 
 __NOTE 1:__ If no output settings are chosen, audioqc will run in with the equivalent of `-s` and `-m` enabled, for signal and technical metadata output.
 
