@@ -230,7 +230,8 @@ class QcTarget
       line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count]
     end
     if options.include? 'meta'
-      line += [@wave_conformance, @qc_results]
+      line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
+      line += [@qc_results]
     end
     return line
   end
@@ -272,7 +273,7 @@ file_inputs.each do |fileinput|
     else
       target.media_conch_scan('Valid Policy File Not Found')
     end
-    target.check_metaedit
+    target.check_metaedit unless TARGET_EXTENSION != 'wav'
   end
   if options.include? 'bext'
     target.qc_encoding_history
@@ -314,7 +315,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include? 'meta'
-    headers << 'Wave Conformance Errors'
+    headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
     headers <<  'MediaConch Policy Compliance'
   end
   csv << headers
