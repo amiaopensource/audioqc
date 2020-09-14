@@ -2,7 +2,7 @@
 
 ## About
 
-This script can target both directories and single audio files, and will generate audio quality control reports to the desktop. Different levels of reports are available through the use of different options. Available information includes:
+This script can target both directories and single audio files, and will generate audio quality control reports to the desktop. If targeting a directory, it will recursively search that and all subdirectories for all files that match the chosen input extension. (Default is WAV). Different levels of reports are available through the use of different options. Available information includes:
 * Peak and average audio levels
 * Number of audio frames exceeding user specified limit (defaults to -2.0 dB)
 * Average audio phase
@@ -37,7 +37,7 @@ Examples:
 * `audioqc -p 'my-mediaconch-policy.xml' -e flac 'My-Flac-Folder'`
 * `audioqc -m -s -b 'My-File.wav'`
 
-__NOTE 1:__ If no output settings are chosen, audioqc will run in with the equivalent of `-s` and `-m` enabled, for signal and technical metadata output.
+__NOTE 1:__ If no output settings are chosen, audioqc will run in with the equivalent of `-m` and `-s` enabled, for signal and technical metadata output.
 
 __NOTE 2:__ If running the QC scan with output for signal information enabled, the scan can take quite a while to run on long or large numbers of files. This is expected and is because the script needs to generate information for every individual audio frame.
 
