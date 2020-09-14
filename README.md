@@ -31,4 +31,27 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 
 ### Usage:
 `Usage:  `audioqc.rb [options] TARGET`
-Options: `-h` Help, ` -e` set target extension (for example `-e flac`). Default is wav. `-p` Override the built in mediaconch policy file with a custom file. `-p PATH-TO-POLICY-FILE`. `-q` Quiet mode - does not create CSV, just gives simple pass/fail in terminal. `-m` Scan file metadata (enabled by default). `-s` Scan file signal with ffprobe (enabled by default).
+
+__NOTE 1:__ If no output settings are chosen, audioqc will run in with the equivalent of `-s` and `-m` enabled, for signal and technical metadata output.
+
+__NOTE 2:__ If running the QC scan with output for signal information enabled, the scan can take quite a while to run on long or large numbers of files. This is expected and is because the script needs to generate information for every individual audio frame.
+
+Options: 
+
+`-h` Help, 
+
+` -e` set target extension (for example `-e flac`). Default is wav. 
+
+`-p` Override the built in mediaconch policy file with a custom file for example `-p PATH-TO-POLICY-FILE`. 
+
+`-q` Quiet mode - does not create CSV, just gives simple pass/fail in terminal. 
+
+`-a` All. Will output information for all possible settings.
+
+`-m` Scan file technical metadata (enabled by default).
+
+`-s` Scan file signal with ffprobe (enabled by default).
+
+`-b` Scan BEXT metadata for consistancy of CodingHistory field
+
+`-d` Scan file for audio dropouts (experimental!)
