@@ -5,7 +5,6 @@ require 'json'
 require 'tempfile'
 require 'csv'
 require 'optparse'
-require 'json'
 require 'yaml'
 
 # Load config file
