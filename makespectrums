@@ -1,0 +1,64 @@
+#!/usr/bin/ruby
+# frozen_string_literal: true
+
+require 'fileutils'
+
+TARGET_EXTENSION = 'wav'
+file_inputs = []
+spectrum_files = []
+
+ARGV.each do |input|
+  input_normalized = input.gsub('\\','/')
+  # If input is directory, recursively add all files with target extension to target list
+  if File.directory?(input_normalized)
+    targets = Dir["#{input_normalized}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
+    targets.each do |file|
+      file_inputs << file
+    end
+  # If input is file, add it to target list (if extension matches target extension)
+  elsif File.extname(input_normalized).downcase == '.' + TARGET_EXTENSION.downcase && File.exist?(input)
+    file_inputs << input
+  else
+    puts "Input: #{input} not found!"
+  end
+end
+
+if file_inputs.empty?
+  puts 'No targets found!'
+  exit
+end
+
+file_inputs.each do |target|
+  spectrum_out = File.dirname(target) + "/" + File.basename(target,".*") + '.jpg'
+  spectrum_files << spectrum_out
+  filter = "showspectrumpic,drawtext=fontsize=56:fontcolor=white:text=#{File.basename(target)}"
+  system('ffmpeg', '-i',target,'-lavfi',filter,'-y',spectrum_out)
+  # if File.exist?(spectrum_out)
+  #   pdf_page = spectrum_out + '.pdf'
+  #   system('convert',spectrum_out,pdf_page)
+  # end
+end
+
+puts 
+
+output_location = ENV['HOME'] + '/Desktop/compiled.pdf'
+spectrum_compile_command = 'convert '
+spectrum_files.each {|spectrum_page| spectrum_compile_command += "'#{spectrum_page}' "}
+spectrum_compile_command += output_location
+#`convert #{spectrum_compile_list} 'test.pdf'`
+#system('convert', spectrum_compile_list, 'test.pdf')
+if `#{spectrum_compile_command}`
+  spectrum_files.each {|input| FileUtils.rm(input)}
+end
+
+
+
+
+
+
+
+
+#{}`ffmpeg -i #{target} -lavfi "showspectrumpic,drawtext=fontsize=
+#56:fontcolor=green:text=#{target}" -y ~/Desktop/test.png`
+
+
