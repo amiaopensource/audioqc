@@ -7,6 +7,8 @@ require 'csv'
 require 'optparse'
 require 'yaml'
 
+Ruby_Version = RUBY_VERSION.to_f
+
 # Load config file
 config_file = "#{__dir__}/audioqc.config"
 Configurations = YAML.load(File.open(config_file).read)
@@ -213,9 +215,14 @@ class QcTarget
     end
     @max_level = @levels.max.round(2)
     @high_level_count = high_db_frames.size
-    @average_levels = (@levels.sum(0.0) / @levels.size).round(2)
     @phasey_frame_count = out_of_phase_frames.size
-    @average_phase = (phase_frames.sum(0.0) / phase_frames.size).round(2)
+    if Ruby_Version > 2.7
+      @average_levels = (@levels.sum(0.0) / @levels.size).round(2)
+      @average_phase = (phase_frames.sum(0.0) / phase_frames.size).round(2)
+    else
+      @average_levels = (@levels.reduce(:+) / @levels.size).round(2)
+      @average_phase = (phase_frames.reduce(:+) / phase_frames.size).round(2)
+    end
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
