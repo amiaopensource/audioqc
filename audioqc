@@ -211,12 +211,14 @@ class QcTarget
     phase_frames = []
     @levels = []
     @ffprobe_out['frames'].each do |frames|
-      peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'].to_f
+      peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'] 
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
       phase_frames << audiophase
       out_of_phase_frames << audiophase if audiophase < Configurations['audio_phase_limit']
-      high_db_frames << peaklevel if peaklevel > Configurations['high_level_warning']
-      @levels << peaklevel
+      if peaklevel != '-inf'
+        high_db_frames << peaklevel.to_f if peaklevel.to_f > Configurations['high_level_warning']
+        @levels << peaklevel.to_f
+      end
     end
     @max_level = @levels.max.round(2)
     @high_level_count = high_db_frames.size
