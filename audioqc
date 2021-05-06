@@ -38,15 +38,15 @@ end
 # If no extenstion is specified it will target the default 'wav' extension. (Not case sensitive)
 options = []
 ARGV.options do |opts|
-  opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
-  opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val.downcase }
-  opts.on('-q', '--Quiet') { options << 'quiet' }
-  opts.on('-m', '--meta-scan') { options << 'meta' }
-  opts.on('-b', '--bext-scan') { options << 'bext' }
-  opts.on('-s', '--signal-scan') { options << 'signal' }
-  opts.on('-d', '--dropout-scan') { options << 'dropouts' }
-  opts.on('-c', '--checksum') { options << 'md5' }
   opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts', 'md5'] }
+  opts.on('-b', '--bext-scan') { options << 'bext' }
+  opts.on('-c', '--checksum') { options << 'md5' }
+  opts.on('-d', '--dropout-scan') { options << 'dropouts' }
+  opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val.downcase }
+  opts.on('-m', '--meta-scan') { options << 'meta' }
+  opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
+  opts.on('-s', '--signal-scan') { options << 'signal' }
+  opts.on('-q', '--Quiet') { options << 'quiet' }
   opts.parse!
 end
 
@@ -112,82 +112,6 @@ class QcTarget
     @warnings = []
   end
 
-  # Function to scan file for mediaconch compliance
-  def media_conch_scan(policy)
-    if File.file?(policy)
-      @qc_results = []
-      policy_path = File.path(policy)
-      command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
-      media_conch_out = `#{command}`
-      media_conch_out.strip!
-      media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
-      @qc_results = @qc_results.to_s
-      if File.exist?(policy)
-        if @qc_results.include?('pass!')
-          @qc_results = 'PASS'
-        else
-          @warnings << 'MEDIACONCH FAIL'
-        end
-      end
-    else
-      @qc_results = policy
-    end
-  end
-
-  # Functions to scan audio stream characteristics
-  # Function to get ffprobe json info
-  def get_ffprobe
-    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
-    @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
-    @total_frame_count = @ffprobe_out['frames'].size
-  end
-
-  def normalize_time(time_source)
-    Time.at(time_source).utc.strftime('%H:%M:%S:%m')
-  end
-
-  def get_mediainfo
-    @mediainfo_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
-    @duration_normalized = Time.at(@mediainfo_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
-  end
-
-  def qc_encoding_history
-    if TARGET_EXTENSION == 'wav'
-    @enc_hist_error = []
-      unless @mediainfo_out['media']['track'][0]['extra'].nil?
-        if  @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
-          signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
-          if @mediainfo_out['media']['track'][1]['Channels'] == "1"
-            unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
-              @enc_hist_error << "BEXT Coding History channels don't match file"
-            end
-          end
-
-          if @mediainfo_out['media']['track'][1]['Channels'] == "2"
-            stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
-            dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
-            unless stereo_count + dual_count == signal_chain_count
-              @enc_hist_error << "BEXT Coding History channels don't match file"
-            end
-          end
-        end
-      else
-        @enc_hist_error << "Encoding history not present"
-      end
-      @warnings << @enc_hist_error if @enc_hist_error.size > 0
-    end
-  end
-
-  def check_metaedit
-    scan_output = `bwfmetaedit "#{@input_path}" 2>&1`.chomp.chomp
-    @wave_conformance = scan_output.split(':').last.strip if scan_output.include?('invalid')
-    if @wave_conformance.nil?
-      @wave_conformance = ' '
-    else
-      @warnings << "Invalid Wave Detected" unless @wave_conformance.nil?
-    end
-  end
-
   def check_dropouts
     @sample_ratios = []
     @possible_drops = []
@@ -204,6 +128,28 @@ class QcTarget
       end
     end
     @warnings << "Possible Dropouts Detected" if @possible_drops.length > 0
+  end
+
+  def check_md5
+    puts "Verifying embedded MD5 for #{@input_path}"
+    md5_line = `bwfmetaedit --MD5-Verify -v "#{@input_path}" 2>&1`.chomp.chomp.split("\n")[0]
+    if md5_line.include?('MD5, no existing MD5 chunk')
+      @warnings << 'No MD5'
+    elsif md5_line.include?('MD5, failed verification')
+      @warnings << 'Failed MD5 Verification'
+    elsif ! md5_line.include?('MD5, verified')
+      @warnings << 'MD5 check unable to be performed'
+    end
+  end
+
+  def check_metaedit
+    scan_output = `bwfmetaedit "#{@input_path}" 2>&1`.chomp.chomp
+    @wave_conformance = scan_output.split(':').last.strip if scan_output.include?('invalid')
+    if @wave_conformance.nil?
+      @wave_conformance = ' '
+    else
+      @warnings << "Invalid Wave Detected" unless @wave_conformance.nil?
+    end
   end
 
   def find_peaks_n_phase
@@ -235,34 +181,87 @@ class QcTarget
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
 
-  def check_md5
-    puts "Verifying embedded MD5 for #{@input_path}"
-    md5_line = `bwfmetaedit --MD5-Verify -v "#{@input_path}" 2>&1`.chomp.chomp.split("\n")[0]
-    if md5_line.include?('MD5, no existing MD5 chunk')
-      @warnings << 'No MD5'
-    elsif md5_line.include?('MD5, failed verification')
-      @warnings << 'Failed MD5 Verification'
-    elsif ! md5_line.include?('MD5, verified')
-      @warnings << 'MD5 check unable to be performed'
+  def get_ffprobe
+    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
+    @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
+    @total_frame_count = @ffprobe_out['frames'].size
+  end
+
+  def get_mediainfo
+    @mediainfo_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
+    @duration_normalized = Time.at(@mediainfo_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
+  end
+
+  # Function to scan file for mediaconch compliance
+  def media_conch_scan(policy)
+    if File.file?(policy)
+      @qc_results = []
+      policy_path = File.path(policy)
+      command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
+      media_conch_out = `#{command}`
+      media_conch_out.strip!
+      media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
+      @qc_results = @qc_results.to_s
+      if File.exist?(policy)
+        if @qc_results.include?('pass!')
+          @qc_results = 'PASS'
+        else
+          @warnings << 'MEDIACONCH FAIL'
+        end
+      end
+    else
+      @qc_results = policy
     end
+  end
+
+  def normalize_time(time_source)
+    Time.at(time_source).utc.strftime('%H:%M:%S:%m')
   end
 
   def output_csv_line(options)
     line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
-    if options.include? 'dropouts'
+    if options.include?('dropouts')
       line << @possible_drops
     end
-    if options.include? 'signal'
+    if options.include?('signal')
       line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count]
     end
-    if options.include? 'meta'
+    if options.include?('meta')
       line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
       line += [@qc_results]
     end
     return line
   end
+
   def output_warnings
     @warnings
+  end
+
+  def qc_encoding_history
+    if TARGET_EXTENSION == 'wav'
+    @enc_hist_error = []
+      unless @mediainfo_out['media']['track'][0]['extra'].nil?
+        if  @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+          signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
+          if @mediainfo_out['media']['track'][1]['Channels'] == "1"
+            unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
+              @enc_hist_error << "BEXT Coding History channels don't match file"
+            end
+          end
+
+          if @mediainfo_out['media']['track'][1]['Channels'] == "2"
+            stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+            dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
+            unless stereo_count + dual_count == signal_chain_count
+              @enc_hist_error << "BEXT Coding History channels don't match file"
+            end
+          end
+        end
+      else
+        @enc_hist_error << "Encoding history not present"
+      end
+      @warnings << @enc_hist_error if @enc_hist_error.size > 0
+    end
   end
 end
 
@@ -293,7 +292,7 @@ end
 file_inputs.each do |fileinput|
   target = QcTarget.new(File.expand_path(fileinput))
   target.get_mediainfo
-  if options.include? 'meta'
+  if options.include?('meta')
     if defined? POLICY_FILE
       target.media_conch_scan(POLICY_FILE)
     else
@@ -309,14 +308,14 @@ file_inputs.each do |fileinput|
   end
   if options.include?('signal') || options.include?('dropouts')
     target.get_ffprobe
-    if options.include? 'signal'
+    if options.include?('signal')
       target.find_peaks_n_phase
     end
-    if options.include? 'dropouts'
+    if options.include?('dropouts')
       target.check_dropouts
     end
   end
-  if options.include? 'quiet'
+  if options.include?('quiet')
     if target.output_warnings.empty?
       puts 'QC Pass!'
       exit 0
@@ -335,15 +334,15 @@ output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
 
 CSV.open(output_csv, 'wb') do |csv|
   headers = ['Filename', 'Warnings', 'Duration']
-  if options.include? 'dropouts'
+  if options.include?('dropouts')
     headers << 'Possible Drops'
   end
 
-  if options.include? 'signal'
+  if options.include?('signal')
    headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings']
   end
 
-  if options.include? 'meta'
+  if options.include?('meta')
     headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
     headers <<  'MediaConch Policy Compliance'
   end
