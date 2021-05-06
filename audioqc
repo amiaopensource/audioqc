@@ -45,7 +45,8 @@ ARGV.options do |opts|
   opts.on('-b', '--bext-scan') { options << 'bext' }
   opts.on('-s', '--signal-scan') { options << 'signal' }
   opts.on('-d', '--dropout-scan') { options << 'dropouts' }
-  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts'] }
+  opts.on('-c', '--checksum') { options << 'md5' }
+  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts', 'md5'] }
   opts.parse!
 end
 
@@ -300,8 +301,10 @@ file_inputs.each do |fileinput|
     end
     target.check_metaedit unless TARGET_EXTENSION != 'wav'
   end
-  if options.include? 'bext'
+  if options.include?('bext')
     target.qc_encoding_history
+  end
+  if options.include?('md5')
     target.check_md5
   end
   if options.include?('signal') || options.include?('dropouts')
