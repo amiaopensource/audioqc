@@ -220,13 +220,13 @@ class QcTarget
 
   def output_csv_line(options)
     line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
-    if options.include? 'dropouts'
+    if options.include?('dropouts')
       line << @possible_drops
     end
-    if options.include? 'signal'
+    if options.include?('signal')
       line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count]
     end
-    if options.include? 'meta'
+    if options.include?('meta')
       line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
       line += [@qc_results]
     end
@@ -292,7 +292,7 @@ end
 file_inputs.each do |fileinput|
   target = QcTarget.new(File.expand_path(fileinput))
   target.get_mediainfo
-  if options.include? 'meta'
+  if options.include?('meta')
     if defined? POLICY_FILE
       target.media_conch_scan(POLICY_FILE)
     else
@@ -308,14 +308,14 @@ file_inputs.each do |fileinput|
   end
   if options.include?('signal') || options.include?('dropouts')
     target.get_ffprobe
-    if options.include? 'signal'
+    if options.include?('signal')
       target.find_peaks_n_phase
     end
-    if options.include? 'dropouts'
+    if options.include?('dropouts')
       target.check_dropouts
     end
   end
-  if options.include? 'quiet'
+  if options.include?('quiet')
     if target.output_warnings.empty?
       puts 'QC Pass!'
       exit 0
@@ -334,15 +334,15 @@ output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
 
 CSV.open(output_csv, 'wb') do |csv|
   headers = ['Filename', 'Warnings', 'Duration']
-  if options.include? 'dropouts'
+  if options.include?('dropouts')
     headers << 'Possible Drops'
   end
 
-  if options.include? 'signal'
+  if options.include?('signal')
    headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings']
   end
 
-  if options.include? 'meta'
+  if options.include?('meta')
     headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
     headers <<  'MediaConch Policy Compliance'
   end
