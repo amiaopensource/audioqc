@@ -45,7 +45,8 @@ ARGV.options do |opts|
   opts.on('-b', '--bext-scan') { options << 'bext' }
   opts.on('-s', '--signal-scan') { options << 'signal' }
   opts.on('-d', '--dropout-scan') { options << 'dropouts' }
-  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts'] }
+  opts.on('-c', '--checksum') { options << 'md5' }
+  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts', 'md5'] }
   opts.parse!
 end
 
@@ -234,6 +235,18 @@ class QcTarget
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
 
+  def check_md5
+    puts "Verifying embedded MD5 for #{@input_path}"
+    md5_line = `bwfmetaedit --MD5-Verify -v "#{@input_path}" 2>&1`.chomp.chomp.split("\n")[0]
+    if md5_line.include?('MD5, no existing MD5 chunk')
+      @warnings << 'No MD5'
+    elsif md5_line.include?('MD5, failed verification')
+      @warnings << 'Failed MD5 Verification'
+    elsif ! md5_line.include?('MD5, verified')
+      @warnings << 'MD5 check unable to be performed'
+    end
+  end
+
   def output_csv_line(options)
     line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
     if options.include? 'dropouts'
@@ -288,8 +301,11 @@ file_inputs.each do |fileinput|
     end
     target.check_metaedit unless TARGET_EXTENSION != 'wav'
   end
-  if options.include? 'bext'
+  if options.include?('bext')
     target.qc_encoding_history
+  end
+  if options.include?('md5')
+    target.check_md5
   end
   if options.include?('signal') || options.include?('dropouts')
     target.get_ffprobe
