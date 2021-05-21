@@ -60,3 +60,9 @@ Options:
 `-b` Scan BEXT metadata for consistency of CodingHistory field
 
 `-d` Scan file for audio dropouts (experimental!)
+
+
+## Maintainers
+Andrew Weaver (@privatezero)
+
+Susie Cummings (@susiecummings)
