@@ -111,7 +111,7 @@ class QcTarget
     @input_path = value
     @warnings = []
   end
-
+  
   def check_dropouts
     @sample_ratios = []
     @possible_drops = []
@@ -157,11 +157,27 @@ class QcTarget
     out_of_phase_frames = []
     phase_frames = []
     @levels = []
+    unless @mediainfo_out['media']['track'][0]['extra'].nil? || TARGET_EXTENSION != 'wav'
+      if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+        @stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+        @dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
+      end
+    end
+    if ! @dual_count.nil? && ! @stereo_count.nil?
+      if @dual_count > 0
+        phase_limit = Configurations['dualmono_audio_phase_limit']
+      elsif
+        @stereo_count > 1
+        phase_limit = Configurations['stereo_audio_phase_limit']
+      end
+    else
+      phase_limit = Configurations['generic_audio_phase_limit']
+    end
     @ffprobe_out['frames'].each do |frames|
       peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'] 
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
       phase_frames << audiophase
-      out_of_phase_frames << audiophase if audiophase < Configurations['audio_phase_limit']
+      out_of_phase_frames << audiophase if audiophase < phase_limit
       if peaklevel != '-inf'
         high_db_frames << peaklevel.to_f if peaklevel.to_f > Configurations['high_level_warning']
         @levels << peaklevel.to_f
@@ -241,7 +257,7 @@ class QcTarget
     if TARGET_EXTENSION == 'wav'
     @enc_hist_error = []
       unless @mediainfo_out['media']['track'][0]['extra'].nil?
-        if  @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+        if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
           signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
           if @mediainfo_out['media']['track'][1]['Channels'] == "1"
             unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
@@ -250,9 +266,9 @@ class QcTarget
           end
 
           if @mediainfo_out['media']['track'][1]['Channels'] == "2"
-            stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
-            dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
-            unless stereo_count + dual_count == signal_chain_count
+            @stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+            @dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
+            unless @stereo_count + @dual_count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
           end
