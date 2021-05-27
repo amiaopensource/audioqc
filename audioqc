@@ -152,7 +152,7 @@ class QcTarget
     end
   end
 
-  def find_peaks_n_phase
+  def find_peaks_loudness_n_phase
     high_db_frames = []
     out_of_phase_frames = []
     phase_frames = []
@@ -193,12 +193,13 @@ class QcTarget
       @average_levels = (@levels.reduce(:+) / @levels.size).round(2)
       @average_phase = (phase_frames.reduce(:+) / phase_frames.size).round(2)
     end
+    @integratedLoudness = @ffprobe_out['frames'][@ffprobe_out.length - 3]['tags']['lavfi.r128.I']
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
     @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
   end
 
   def get_ffprobe
-    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0"'
+    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase,lavfi.r128.I -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
     @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
     @total_frame_count = @ffprobe_out['frames'].size
   end
@@ -240,7 +241,7 @@ class QcTarget
       line << @possible_drops
     end
     if options.include?('signal')
-      line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count]
+      line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count, @integratedLoudness]
     end
     if options.include?('meta')
       line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
@@ -325,7 +326,7 @@ file_inputs.each do |fileinput|
   if options.include?('signal') || options.include?('dropouts')
     target.get_ffprobe
     if options.include?('signal')
-      target.find_peaks_n_phase
+      target.find_peaks_loudness_n_phase
     end
     if options.include?('dropouts')
       target.check_dropouts
@@ -355,7 +356,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include?('signal')
-   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings']
+   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
   end
 
   if options.include?('meta')
