@@ -304,6 +304,8 @@ end
 if file_inputs.empty?
   puts 'No targets found!'
   exit
+else
+  file_inputs.sort!
 end
 
 file_inputs.each do |fileinput|
