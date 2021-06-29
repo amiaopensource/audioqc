@@ -123,6 +123,7 @@ class QcTarget
         diff_prior = (ratio - @sample_ratios[i - 1]).abs
         diff_post = (ratio - @sample_ratios[i + 1]).abs
         if diff_prior > 15 && diff_post > 15
+          # I think there is something wonky with how ffmpeg splits to frames vs samples - this math for finding time needs to be looked at
           @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out['media']['track'][1]['SamplingRate'].to_f) 
         end
       end
@@ -166,9 +167,10 @@ class QcTarget
     if ! @dual_count.nil? && ! @stereo_count.nil?
       if @dual_count > 0
         phase_limit = Configurations['dualmono_audio_phase_limit']
-      elsif
-        @stereo_count > 1
+      elsif @stereo_count > 1
         phase_limit = Configurations['stereo_audio_phase_limit']
+      else
+        phase_limit = Configurations['generic_audio_phase_limit']
       end
     else
       phase_limit = Configurations['generic_audio_phase_limit']
