@@ -31,7 +31,7 @@ end
 file_inputs.each do |target|
   spectrum_out = File.dirname(target) + "/" + File.basename(target,".*") + '.jpg'
   spectrum_files << spectrum_out
-  filter = "showspectrumpic,drawtext=fontsize=56:fontcolor=white:text=#{File.basename(target)}"
+  filter = "highpass=f=8000,showspectrumpic=fscale=lin,drawtext=fontsize=56:fontcolor=white:text=#{File.basename(target)}"
   system('ffmpeg', '-i',target,'-lavfi',filter,'-y',spectrum_out)
   # if File.exist?(spectrum_out)
   #   pdf_page = spectrum_out + '.pdf'
