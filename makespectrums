@@ -28,6 +28,7 @@ if file_inputs.empty?
   exit
 end
 
+file_inputs.sort!
 file_inputs.each do |target|
   spectrum_out = File.dirname(target) + "/" + File.basename(target,".*") + '.jpg'
   spectrum_files << spectrum_out
@@ -41,7 +42,9 @@ end
 
 puts 
 
-output_location = ENV['HOME'] + '/Desktop/compiled.pdf'
+
+timestamp = Time.now.strftime('%Y-%m-%d_%H-%M-%S')
+output_location = ENV['HOME'] + "/Desktop/audioqc-spectrum-report_#{timestamp}.pdf"
 spectrum_compile_command = 'convert '
 spectrum_files.each {|spectrum_page| spectrum_compile_command += "'#{spectrum_page}' "}
 spectrum_compile_command += output_location
@@ -50,15 +53,5 @@ spectrum_compile_command += output_location
 if `#{spectrum_compile_command}`
   spectrum_files.each {|input| FileUtils.rm(input)}
 end
-
-
-
-
-
-
-
-
-#{}`ffmpeg -i #{target} -lavfi "showspectrumpic,drawtext=fontsize=
-#56:fontcolor=green:text=#{target}" -y ~/Desktop/test.png`
 
 
