@@ -30,12 +30,13 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 ## Usage:
 
 ### audioqc
-`audioqc [options] TARGET`
+Usage: `audioqc [options] TARGET`
 Target can be either individual files, or a directory. This will result in a CSV output to your desktop.
 
 A standard profile of settings and options is stored in the configuration file. If audioqc is run with no options, these stored options will be used as a default profile. To change default settings run `audioqc -o` or `audioqc --options` to edit the values contained in the associated file `audioqc.config`. 
 
 Examples: 
+* `audioqc -h` This will display all available options
 * `audioqc 'My-File.wav'` (This will run with options saved in config file)
 * `audioqc -m 'My-File.wav'` (This will run only a metadata scan)
 * `audioqc -p 'my-mediaconch-policy.xml' -e flac 'My-Flac-Folder'` (This will target files with a .flac extension and use a custom mediaconch policy.)
@@ -43,7 +44,7 @@ Examples:
 __NOTE:__ If running the QC scan with output for signal information enabled, the scan can take quite a while to run on long or large numbers of files. This is expected and is because the script needs to generate information for every individual audio frame.
 
 ### makespectrums
-`makespectrums TARGET`
+Usage: `makespectrums TARGET`
 This tool will create a compiled PDF of audio spectrums (high pass filter applied). Input can be individual files or a directory. Audio errors and drops can sometimes be identified by vertical lines that reach all the way to the top of the spectrum. (See example below which contains two dropouts)
 
 ![Audio dropout example](dropout-example.png)
