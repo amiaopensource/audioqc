@@ -49,7 +49,8 @@ ARGV.options do |opts|
   opts.parse!
 end
 
-options += ['signal', 'meta'] if (options).empty?
+options += Configurations['default_options']
+options.uniq!
 
 # set up arrays and variables
 TARGET_EXTENSION = Configurations['default_extension'] unless defined? TARGET_EXTENSION
