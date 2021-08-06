@@ -17,14 +17,17 @@ Configurations = YAML.load(File.open(config_file).read)
 # Check system
 if Gem::Platform.local.os == 'mingw32'
   System = 'windows'
+elsif Gem::Platform.local.os == 'linux'
+  System = 'linux'
 else
-  System = 'not-windows'
+  #needs to be updated with actual check for mac!
+  System = 'mac'
 end
 
 
 dependencies = ['bwfmetaedit', 'ffprobe', 'mediaconch']
 missing_dependencies = []
-if System == 'not-windows'
+unless System == 'windows'
   dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
   if missing_dependencies.length > 0
     missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
@@ -44,13 +47,28 @@ ARGV.options do |opts|
   opts.on('-d', '--dropout-scan') { options << 'dropouts' }
   opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val.downcase }
   opts.on('-m', '--meta-scan') { options << 'meta' }
+  opts.on('-o', '--options') { options << 'edit-options'}
   opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
   opts.on('-s', '--signal-scan') { options << 'signal' }
   opts.parse!
 end
 
-options += Configurations['default_options']
-options.uniq!
+if options.include?('edit-options')
+  if System == 'linux'
+    system('xdg-open', config_file)
+  elsif System == 'mingw32'
+    system('start','notepad', config_file)
+  else
+    system('open', config_file)
+  end
+  exit
+elsif options.count == 0 && ARGV.count == 0
+  puts 'For list of available options please run: audioqc -h'
+  exit
+elsif options.count == 0
+  options = Configurations['default_options']
+end
+
 
 # set up arrays and variables
 TARGET_EXTENSION = Configurations['default_extension'] unless defined? TARGET_EXTENSION
