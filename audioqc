@@ -19,9 +19,12 @@ if Gem::Platform.local.os == 'mingw32'
   System = 'windows'
 elsif Gem::Platform.local.os == 'linux'
   System = 'linux'
-else
-  #needs to be updated with actual check for mac!
+elsif
+  Gem::Platform.local.os == 'darwin'
   System = 'mac'
+else
+  puts "Operating system has not been correctly detected. Linux will be assumed - errors may occur!"
+  System = 'linux'
 end
 
 
@@ -72,6 +75,18 @@ end
 
 # set up arrays and variables
 TARGET_EXTENSION = Configurations['default_extension'] unless defined? TARGET_EXTENSION
+
+# set up output CSV path
+timestamp = Time.now.strftime('%Y-%m-%d_%H-%M-%S')
+if Configurations['csv_output_path'].empty?
+  output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
+else
+  output_csv = Configurations['csv_output_path'] + "/audioqc-out_#{timestamp}.csv" 
+end
+if ! Dir.exist?(File.dirname(output_csv))
+  puts "Output directory not found. Please configure a valid output directory"
+  exit 1
+end
 
 # Start embedded WAV Mediaconch policy section
 # Policy derived from MediaConch Public Policies. Original Maintainer Peter B. License: CC-BY-4.0+
@@ -356,9 +371,6 @@ file_inputs.each do |fileinput|
   end
   write_to_csv << target.output_csv_line(options)
 end
-
-timestamp = Time.now.strftime('%Y-%m-%d_%H-%M-%S')
-output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
 
 CSV.open(output_csv, 'wb') do |csv|
   headers = ['Filename', 'Warnings', 'Duration']
