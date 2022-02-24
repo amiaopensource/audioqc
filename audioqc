@@ -44,7 +44,7 @@ end
 # If no extenstion is specified it will target the default 'wav' extension. (Not case sensitive)
 options = []
 ARGV.options do |opts|
-  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'dropouts', 'md5'] }
+  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'md5'] }
   opts.on('-b', '--bext-scan') { options << 'bext' }
   opts.on('-c', '--checksum') { options << 'md5' }
   opts.on('-d', '--dropout-scan') { options << 'dropouts' }
@@ -344,6 +344,7 @@ else
 end
 
 file_inputs.each do |fileinput|
+  puts "Scanning: #{fileinput}"
   target = QcTarget.new(File.expand_path(fileinput))
   target.get_mediainfo
   if options.include?('meta')
