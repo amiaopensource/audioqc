@@ -250,10 +250,10 @@ class QcTarget
       @qc_results = []
       policy_path = File.path(policy)
       command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
-      media_conch_out = `#{command}`
+      media_conch_out = `#{command}`.gsub(@input_path, "")
       media_conch_out.strip!
       media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
-      @qc_results = @qc_results.to_s
+      @qc_results = @qc_results.to_s.gsub('\n   -- ', '; ')
       if File.exist?(policy)
         if @qc_results.include?('pass!')
           @qc_results = 'PASS'
