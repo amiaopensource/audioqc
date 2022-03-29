@@ -271,7 +271,11 @@ class QcTarget
   end
 
   def output_csv_line(options)
-    line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
+    if options.include?('error')
+      line = [@input_path, 'FAILED TO PARSE']
+    else
+      line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
+    end
     if options.include?('dropouts')
       line << @possible_drops
     end
@@ -344,33 +348,39 @@ else
 end
 
 file_inputs.each do |fileinput|
-  puts "Scanning: #{fileinput}"
-  target = QcTarget.new(File.expand_path(fileinput))
-  target.get_mediainfo
-  if options.include?('meta')
-    if defined? POLICY_FILE
-      target.media_conch_scan(POLICY_FILE)
-    else
-      target.media_conch_scan('Valid Policy File Not Found')
+  begin
+    puts "Scanning: #{fileinput}"
+    targetPath = File.expand_path(fileinput)
+    target = QcTarget.new(targetPath)
+    target.get_mediainfo
+    if options.include?('meta')
+      if defined? POLICY_FILE
+        target.media_conch_scan(POLICY_FILE)
+      else
+        target.media_conch_scan('Valid Policy File Not Found')
+      end
+      target.check_metaedit unless TARGET_EXTENSION != 'wav'
     end
-    target.check_metaedit unless TARGET_EXTENSION != 'wav'
-  end
-  if options.include?('bext')
-    target.qc_encoding_history
-  end
-  if options.include?('md5')
-    target.check_md5
-  end
-  if options.include?('signal') || options.include?('dropouts')
-    target.get_ffprobe
-    if options.include?('signal')
-      target.find_peaks_loudness_n_phase
+    if options.include?('bext')
+      target.qc_encoding_history
     end
-    if options.include?('dropouts')
-      target.check_dropouts
+    if options.include?('md5')
+      target.check_md5
     end
+    if options.include?('signal') || options.include?('dropouts')
+      target.get_ffprobe
+      if options.include?('signal')
+        target.find_peaks_loudness_n_phase
+      end
+      if options.include?('dropouts')
+        target.check_dropouts
+      end
+    end
+    write_to_csv << target.output_csv_line(options)
+  rescue
+    puts "Error scanning: #{targetPath}"
+    write_to_csv << target.output_csv_line('error')
   end
-  write_to_csv << target.output_csv_line(options)
 end
 
 CSV.open(output_csv, 'wb') do |csv|
