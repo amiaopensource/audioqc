@@ -242,6 +242,7 @@ class QcTarget
   def get_mediainfo
     @mediainfo_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
     @duration_normalized = Time.at(@mediainfo_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
+    @channel_count = @mediainfo_out['media']['track'][1]['Channels']
   end
 
   # Function to scan file for mediaconch compliance
@@ -274,7 +275,7 @@ class QcTarget
     if options.include?('error')
       line = [@input_path, 'FAILED TO PARSE']
     else
-      line = [@input_path, @warnings.flatten.join(', '), @duration_normalized]
+      line = [@input_path, @warnings.flatten.join(', '), @duration_normalized, @channel_count]
     end
     if options.include?('dropouts')
       line << @possible_drops
@@ -299,15 +300,15 @@ class QcTarget
       unless @mediainfo_out['media']['track'][0]['extra'].nil?
         if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
           signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
-          if @mediainfo_out['media']['track'][1]['Channels'] == "1"
+          if @channel_count == "1"
             unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
           end
 
-          if @mediainfo_out['media']['track'][1]['Channels'] == "2"
+          if @channel_count == "2"
             @stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
-            @dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
+            @dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].gsub("dual-sided","").scan(/dual/i).count
             unless @stereo_count + @dual_count == signal_chain_count
               @enc_hist_error << "BEXT Coding History channels don't match file"
             end
@@ -384,7 +385,7 @@ file_inputs.each do |fileinput|
 end
 
 CSV.open(output_csv, 'wb') do |csv|
-  headers = ['Filename', 'Warnings', 'Duration']
+  headers = ['Filename', 'Warnings', 'Duration', 'Channels']
   if options.include?('dropouts')
     headers << 'Possible Drops'
   end
