@@ -322,6 +322,12 @@ class QcTarget
   end
 end
 
+def write_csv_line(output_csv,line)
+  CSV.open(output_csv, 'a') do |csv|
+    csv << line
+  end
+end
+
 # Make list of inputs
 file_inputs = []
 write_to_csv = []
@@ -348,6 +354,27 @@ else
   file_inputs.sort!
 end
 
+
+# Begin CSV
+CSV.open(output_csv, 'wb') do |csv|
+  headers = ['Filename', 'Warnings', 'Duration', 'Channels']
+  if options.include?('dropouts')
+    headers << 'Possible Drops'
+  end
+
+  if options.include?('signal')
+   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
+  end
+
+  if options.include?('meta')
+    headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
+    headers <<  'MediaConch Policy Compliance'
+  end
+  csv << headers
+end
+
+
+# Scan files
 file_inputs.each do |fileinput|
   begin
     puts "Scanning: #{fileinput}"
@@ -377,29 +404,9 @@ file_inputs.each do |fileinput|
         target.check_dropouts
       end
     end
-    write_to_csv << target.output_csv_line(options)
+    write_csv_line(output_csv,target.output_csv_line(options))
   rescue
     puts "Error scanning: #{targetPath}"
-    write_to_csv << target.output_csv_line('error')
-  end
-end
-
-CSV.open(output_csv, 'wb') do |csv|
-  headers = ['Filename', 'Warnings', 'Duration', 'Channels']
-  if options.include?('dropouts')
-    headers << 'Possible Drops'
-  end
-
-  if options.include?('signal')
-   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
-  end
-
-  if options.include?('meta')
-    headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
-    headers <<  'MediaConch Policy Compliance'
-  end
-  csv << headers
-  write_to_csv.each do |line|
-    csv << line
+    write_csv_line(output_csv,target.output_csv_line('error'))
   end
 end
