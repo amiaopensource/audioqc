@@ -200,6 +200,8 @@ class QcTarget
       @ffprobe_out['frames'].each do |frame|
         channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f
         channel_two_vol << frame['tags']['lavfi.astats.2.Peak_level'].to_f
+        @channel_one_max = channel_one_vol.max
+        @channel_two_max = channel_two_vol.max
         channel_dif = (channel_one_vol.max - channel_two_vol.max).abs.to_s
         if channel_two_vol.max < channel_one_vol.max
           @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[b]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[a][c]amerge[out1]" -map [out1] '
@@ -316,7 +318,13 @@ class QcTarget
       line << @possible_drops
     end
     if options.include?('signal')
-      line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count, @integratedLoudness]
+      line += [@average_levels, @max_level,@high_level_count]
+      if @channel_count == "2"
+        line+= [@channel_one_max,@channel_two_max]
+      else
+        line += [' ', ' ']
+      end
+      line +=[@average_phase, @phasey_frame_count, @integratedLoudness]
     end
     if options.include?('meta')
       line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
@@ -398,7 +406,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include?('signal')
-   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
+    headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Channel 1 Max', 'Channel 2 Max', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
   end
 
   if options.include?('meta')
