@@ -187,7 +187,7 @@ class QcTarget
   end
 
   def get_ffprobe_phase_normalized(volume_command)
-    ffprobe_command = 'ffmpeg -i ' + @input_path + volume_command + ' -f nut - | ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + 'pipe\\:0' + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+    ffprobe_command = 'ffmpeg -i ' + @input_path + volume_command + ' -f wav - | ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + 'pipe\\:0' + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
     @ffprobe_phase = JSON.parse(`#{ffprobe_command}`)
   end
 
