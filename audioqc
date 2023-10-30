@@ -203,14 +203,14 @@ class QcTarget
         else
           channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f
           channel_two_vol << frame['tags']['lavfi.astats.2.Peak_level'].to_f
-          @channel_one_max = channel_one_vol.max
-          @channel_two_max = channel_two_vol.max
-          channel_dif = (channel_one_vol.max - channel_two_vol.max).abs.to_s
-          if channel_two_vol.max < channel_one_vol.max
-            @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[b]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[a][c]amerge[out1]" -map [out1] '
-          else
-            @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[a]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[c][b]amerge[out1]" -map [out1] '
-          end
+        end
+        @channel_one_max = channel_one_vol.max
+        @channel_two_max = channel_two_vol.max
+        channel_dif = (channel_one_vol.max - channel_two_vol.max).abs.to_s
+        if channel_two_vol.max < channel_one_vol.max
+          @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[b]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[a][c]amerge[out1]" -map [out1] '
+        else
+          @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[a]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[c][b]amerge[out1]" -map [out1] '
         end
       end
       get_ffprobe_phase_normalized(@volume_command)
