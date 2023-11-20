@@ -33,7 +33,19 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 Usage: `audioqc [options] TARGET`
 Target can be either individual files, or a directory. This will result in a CSV output to your desktop.
 
-A standard profile of settings and options is stored in the configuration file. If audioqc is run with no options, these stored options will be used as a default profile. To change default settings run `audioqc -o` or `audioqc --options` to edit the values contained in the associated file `audioqc.config`. 
+Available options are:
+
+    -a, --all
+    -b, --bext-scan
+    -c, --checksum
+    -d, --dropout-scan
+    -e, --Extension=val
+    -m, --meta-scan
+    -o, --options
+    -p, --Policy=val
+    -s, --signal-scan
+
+A standard profile of settings and options is stored in the configuration file. If audioqc is run with no options, these stored options will be used as a default profile. To change default settings run `audioqc -o` or `audioqc --options` to edit the values contained in the associated file `audioqc.config`. Desired defaults can be added to the line `default_options` and separated with commas. Choices are: `meta, bext, signal, md5` and by default all of these modes are enabled.
 
 Examples: 
 * `audioqc -h` This will display all available options
