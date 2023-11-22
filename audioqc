@@ -186,11 +186,47 @@ class QcTarget
     end
   end
 
-  def find_peaks_loudness_n_phase
-    high_db_frames = []
+  def get_ffprobe_phase_normalized(volume_command)
+    ffprobe_command = 'ffmpeg -i ' + @input_path + volume_command + ' -f wav - | ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + 'pipe\\:0' + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+    @ffprobe_phase = JSON.parse(`#{ffprobe_command}`)
+  end
+
+  def get_ffprobe
+    if @channel_count == "2"
+      channel_one_vol = []
+      channel_two_vol = []
+      ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.r128.I -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,ebur128=metadata=1"'
+      @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
+      @ffprobe_out['frames'].each do |frame|
+        if frame['tags']['lavfi.astats.1.Peak_level'] == '-inf' || frame['tags']['lavfi.astats.2.Peak_level'] == 'inf'
+          next
+        else
+          channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f
+          channel_two_vol << frame['tags']['lavfi.astats.2.Peak_level'].to_f
+        end
+        @channel_one_max = channel_one_vol.max
+        @channel_two_max = channel_two_vol.max
+        channel_dif = (channel_one_vol.max - channel_two_vol.max).abs.to_s
+        if channel_two_vol.max < channel_one_vol.max
+          @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[b]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[a][c]amerge[out1]" -map [out1] '
+        else
+          @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[a]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[c][b]amerge[out1]" -map [out1] '
+        end
+      end
+      get_ffprobe_phase_normalized(@volume_command)
+    else
+      ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase,lavfi.r128.I -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+      @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
+      @ffprobe_phase = @ffprobe_out
+    end
+    @total_frame_count = @ffprobe_out['frames'].size
+    # change this to find peak volume for each channel and calculate difference
+    # volume_ratio = peak1 / peak 2
+  end
+
+  def check_phase
     out_of_phase_frames = []
     phase_frames = []
-    @levels = []
     unless @mediainfo_out['media']['track'][0]['extra'].nil? || TARGET_EXTENSION != 'wav'
       if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
         @stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
@@ -208,35 +244,40 @@ class QcTarget
     else
       phase_limit = Configurations['generic_audio_phase_limit']
     end
-    @ffprobe_out['frames'].each do |frames|
-      peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'] 
+    @ffprobe_phase['frames'].each do |frames|
       audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
       phase_frames << audiophase
       out_of_phase_frames << audiophase if audiophase < phase_limit
+    end
+    @phasey_frame_count = out_of_phase_frames.size
+    if Ruby_Version > 2.7
+      @average_phase = (phase_frames.sum(0.0) / phase_frames.size).round(2)
+    else
+      @average_phase = (phase_frames.reduce(:+) / phase_frames.size).round(2)
+    end
+    @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
+  end
+
+  def find_peaks_loudness_n_phase
+    high_db_frames = []
+    @levels = []
+    @ffprobe_out['frames'].each do |frames|
+      peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'] 
       if peaklevel != '-inf'
         high_db_frames << peaklevel.to_f if peaklevel.to_f > Configurations['high_level_warning']
         @levels << peaklevel.to_f
       end
     end
+
     @max_level = @levels.max.round(2)
     @high_level_count = high_db_frames.size
-    @phasey_frame_count = out_of_phase_frames.size
     if Ruby_Version > 2.7
       @average_levels = (@levels.sum(0.0) / @levels.size).round(2)
-      @average_phase = (phase_frames.sum(0.0) / phase_frames.size).round(2)
     else
       @average_levels = (@levels.reduce(:+) / @levels.size).round(2)
-      @average_phase = (phase_frames.reduce(:+) / phase_frames.size).round(2)
     end
     @integratedLoudness = @ffprobe_out['frames'][@ffprobe_out.length - 3]['tags']['lavfi.r128.I']
     @warnings << 'LEVEL WARNING' if @high_level_count > 0
-    @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
-  end
-
-  def get_ffprobe
-    ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase,lavfi.r128.I -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
-    @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
-    @total_frame_count = @ffprobe_out['frames'].size
   end
 
   def get_mediainfo
@@ -281,7 +322,13 @@ class QcTarget
       line << @possible_drops
     end
     if options.include?('signal')
-      line += [@average_levels, @max_level, @high_level_count, @average_phase, @phasey_frame_count, @integratedLoudness]
+      line += [@average_levels, @max_level,@high_level_count]
+      if @channel_count == "2"
+        line+= [@channel_one_max,@channel_two_max]
+      else
+        line += [' ', ' ']
+      end
+      line +=[@average_phase, @phasey_frame_count, @integratedLoudness]
     end
     if options.include?('meta')
       line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
@@ -363,7 +410,7 @@ CSV.open(output_csv, 'wb') do |csv|
   end
 
   if options.include?('signal')
-   headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
+    headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Channel 1 Max', 'Channel 2 Max', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
   end
 
   if options.include?('meta')
@@ -399,6 +446,7 @@ file_inputs.each do |fileinput|
       target.get_ffprobe
       if options.include?('signal')
         target.find_peaks_loudness_n_phase
+        target.check_phase
       end
       if options.include?('dropouts')
         target.check_dropouts
