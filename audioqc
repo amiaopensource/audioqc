@@ -198,7 +198,7 @@ class QcTarget
       ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.r128.I -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,ebur128=metadata=1"'
       @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
       @ffprobe_out['frames'].each do |frame|
-        if frame['tags']['lavfi.astats.1.Peak_level'] == '-inf' || frame['tags']['lavfi.astats.2.Peak_level'] == 'inf'
+        if frame['tags']['lavfi.astats.1.Peak_level'] == '-inf' || frame['tags']['lavfi.astats.2.Peak_level'] == '-inf'
           next
         else
           channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f
