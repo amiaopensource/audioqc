@@ -216,13 +216,12 @@ class QcTarget
       end
       get_ffprobe_phase_normalized(@volume_command)
     else
-      ffprobe_command = 'ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase,lavfi.r128.I -f lavfi -i "amovie=' + "\\'" + @input_path + "\\'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+      ffprobe_command = "ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+      ffprobe_command.gsub!(':','\:')
       @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
       @ffprobe_phase = @ffprobe_out
     end
     @total_frame_count = @ffprobe_out['frames'].size
-    # change this to find peak volume for each channel and calculate difference
-    # volume_ratio = peak1 / peak 2
   end
 
   def check_phase
