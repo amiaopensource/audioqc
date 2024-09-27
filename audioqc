@@ -166,12 +166,12 @@ class QcTarget
 
   def check_md5
     puts "Verifying embedded MD5 for #{@input_path}"
-    md5_line = `bwfmetaedit --MD5-Verify -v "#{@input_path}" 2>&1`.chomp.chomp.split("\n")[0]
-    if md5_line.include?('MD5, no existing MD5 chunk')
+    md5_output = `bwfmetaedit --MD5-Verify -v "#{@input_path}" 2>&1`.chomp.split("\n")
+    if md5_output.any? {|line| line.include?('MD5, no existing MD5 chunk')}
       @warnings << 'No MD5'
-    elsif md5_line.include?('MD5, failed verification')
+    elsif md5_output.any? {|line| line.include?('MD5, failed verification')}
       @warnings << 'Failed MD5 Verification'
-    elsif ! md5_line.include?('MD5, verified')
+    elsif ! md5_output.any? {|line| line.include?('MD5, verified')}
       @warnings << 'MD5 check unable to be performed'
     end
   end
