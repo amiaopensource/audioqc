@@ -334,6 +334,9 @@ class QcTarget
       line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
       line += [@qc_results]
     end
+    if options.include?('bext')
+      line += [@encoding_history]
+    end
     return line
   end
 
@@ -346,6 +349,7 @@ class QcTarget
     @enc_hist_error = []
       unless @mediainfo_out['media']['track'][0]['extra'].nil?
         if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+          @encoding_history = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
           signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
           if @channel_count == "1"
             unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
@@ -416,6 +420,10 @@ CSV.open(output_csv, 'wb') do |csv|
   if options.include?('meta')
     headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
     headers <<  'MediaConch Policy Compliance'
+  end
+
+  if options.include?('bext')
+    headers << 'Coding History'
   end
   csv << headers
 end
