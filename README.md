@@ -1,16 +1,15 @@
 # audioqc
 
 ## About
+This tool is intended to assist with batch/collection level quality control of archival WAV files digitized from analog sources. It can target directories and single audio files, and will generate audio quality control reports in CSV to the desktop or user specified location. It scans for peak/average audio levels, files with 'hot' portions exceeding a user set limit, audio phase, file integrity (from embedded MD5 checksums), bext metadata conformance and mediaconch policy conformance. It also can generate images of the audio spectrum and waveform of each input file.
 
-This repository contains two scripts - audioqc and makespectrum. Both are intended to aid with collection level quality control of digitized audio files.
-
-* audioqc: This script can target both directories and single audio files, and will generate audio quality control reports in CSV to the desktop. It can scan for peak/average audio levels, files with 'hot' portions exceeding a user set limit, audio phase, bext metadata conformance, mediaconch policy conformance, and a VERY experimental mode for detecting dropouts.
-
-* makespectrum: This script will compile a document of audio spectrums for all inputs. It applies a high-pass filter to inputs to attempt to make visually identifying audio errors and drop-outs simpler.
+Development note: This tool was rewritten in 2025 to simplify usage, code and dependencies. For the legacy code, see [here](https://github.com/amiaopensource/audioqc/tree/new-code-base/deprecated) or the [final release](https://github.com/amiaopensource/audioqc/releases/tag/2025-05-23) containing the previous code.
 
 
-## Set-up
-Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Ruby
+## Setup
+
+Requires Ruby, CLI versions of FFmpeg/FFprobe, Mediainfo and Mediaconch.
+Configurations, such as dependency paths can be set in the associated CSV file.
 
 ### Mac:
 * All dependencies and audioqc scripts can be installed via the [Homebrew package manager](https://brew.sh/)
@@ -18,7 +17,7 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 
 ### Windows:
 * [Ruby](https://rubyinstaller.org/) will need to be installed if it isn't present already.
-* All dependencies will have to be added to the 'Path' and should be the command line version (CLI) of their respective tools
+* All dependencies will have to be added to the 'Path' (or have their locations noted in the configuration file) and should be the command line version (CLI) of their respective tools
 * MediaConch, MediaInfo and BWF MetaEdit can be downloaded from the [MediaArea](https://mediaarea.net/) website
 * ffprobe can be downloaded as part of the [FFmpeg package](https://ffmpeg.org/download.html#build-windows)
 
@@ -28,40 +27,17 @@ Requires CLI installations of: ffprobe, MediaConch, MediaInfo, BWF MetaEdit, Rub
 * For the most up to date versions of MediaArea dependencies it is recommended to activate the [MediaArea](https://mediaarea.net/en/Repos) repository
 
 ## Usage:
-
-### audioqc
-Usage: `audioqc [options] TARGET`
-Target can be either individual files, or a directory. This will result in a CSV output to your desktop.
-
+Usage: `audioqc [options] TARGET(s)` Target can be either individual files, or a directory, or a combination of the two. This will result in a CSV output to your desktop.
 Available options are:
 
-    -a, --all
-    -b, --bext-scan
-    -c, --checksum
-    -d, --dropout-scan
-    -e, --Extension=val
-    -m, --meta-scan
-    -o, --options
-    -p, --Policy=val
-    -s, --signal-scan
+    -o, --output=val                 Optional output path for CSV results file
+    -c, --conch=val                  Path to optional mediaconch policy XML file
+    -j, --jpg                        Create visualizations of input files (waveform and spectrum)
 
-A standard profile of settings and options is stored in the configuration file. If audioqc is run with no options, these stored options will be used as a default profile. To change default settings run `audioqc -o` or `audioqc --options` to edit the values contained in the associated file `audioqc.config`. Desired defaults can be added to the line `default_options` and separated with commas. Choices are: `meta, bext, signal, md5` and by default all of these modes are enabled.
+Congiguration of this tool can be done via the associated `settings.csv` file. Configurable options include settings for what the tools considers 'out of range' for volume and phase, as well as paths for output, mediaconch policies and dependencies.
 
-Examples: 
-* `audioqc -h` This will display all available options
-* `audioqc 'My-File.wav'` (This will run with options saved in config file)
-* `audioqc -m 'My-File.wav'` (This will run only a metadata scan)
-* `audioqc -p 'my-mediaconch-policy.xml' -e flac 'My-Flac-Folder'` (This will target files with a .flac extension and use a custom mediaconch policy.)
-
-__NOTE:__ If running the QC scan with output for signal information enabled, the scan can take quite a while to run on long or large numbers of files. This is expected and is because the script needs to generate information for every individual audio frame.
-
-### makespectrums
-Usage: `makespectrums TARGET`
-This tool will create a compiled PDF of audio spectrums (high pass filter applied). Input can be individual files or a directory. Audio errors and drops can sometimes be identified by vertical lines that reach all the way to the top of the spectrum. (See example below which contains two dropouts)
-
-![Audio dropout example](dropout-example.png)
+Note: The scan can take a while to run on large batches of files - this is expected!
 
 ## Maintainers
 Andrew Weaver (@privatezero)
-
 Susie Cummings (@susiecummings)

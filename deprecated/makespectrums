@@ -50,8 +50,8 @@ spectrum_files.each {|spectrum_page| spectrum_compile_command += "'#{spectrum_pa
 spectrum_compile_command += output_location
 #`convert #{spectrum_compile_list} 'test.pdf'`
 #system('convert', spectrum_compile_list, 'test.pdf')
-if `#{spectrum_compile_command}`
-  spectrum_files.each {|input| FileUtils.rm(input)}
-end
+# if `#{spectrum_compile_command}`
+#   spectrum_files.each {|input| FileUtils.rm(input)}
+# end
 
 
