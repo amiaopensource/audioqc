@@ -34,7 +34,7 @@ Available options are:
     -c, --conch=val                  Path to optional mediaconch policy XML file
     -j, --jpg                        Create visualizations of input files (waveform and spectrum)
 
-Congiguration of this tool can be done via the associated `settings.csv` file. Configurable options include settings for what the tools considers 'out of range' for volume and phase, as well as paths for output, mediaconch policies and dependencies.
+Configuration of this tool can be done via the associated `settings.csv` file. Configurable options include settings for what the tools considers 'out of range' for volume and phase, as well as paths for output, mediaconch policies and dependencies.
 
 Note: The scan can take a while to run on large batches of files - this is expected!
 
