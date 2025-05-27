@@ -1,0 +1,481 @@
+#!/usr/bin/env ruby
+
+# frozen_string_literal: true
+
+require 'json'
+require 'tempfile'
+require 'csv'
+require 'optparse'
+require 'yaml'
+
+Ruby_Version = RUBY_VERSION.to_f
+
+# Load config file
+config_file = "#{__dir__}/audioqc.config"
+Configurations = YAML.load(File.open(config_file).read)
+
+# Check system
+if Gem::Platform.local.os == 'mingw32'
+  System = 'windows'
+elsif Gem::Platform.local.os == 'linux'
+  System = 'linux'
+elsif
+  Gem::Platform.local.os == 'darwin'
+  System = 'mac'
+else
+  puts "Operating system has not been correctly detected. Linux will be assumed - errors may occur!"
+  System = 'linux'
+end
+
+
+dependencies = ['bwfmetaedit', 'ffprobe', 'mediaconch']
+missing_dependencies = []
+unless System == 'windows'
+  dependencies.each {|test| missing_dependencies << test unless system("which #{test} > /dev/null")}
+  if missing_dependencies.length > 0
+    missing_dependencies.each {|missing| puts "Please install missing dependency: #{missing}"}
+    exit
+  end
+end
+
+# This controls option flags
+# -p option allows you to select a custom mediaconch policy file - otherwise script uses default
+# -e allows you to select a target file extenstion for the script to use.
+# If no extenstion is specified it will target the default 'wav' extension. (Not case sensitive)
+options = []
+ARGV.options do |opts|
+  opts.on('-a', '--all') { options += ['meta', 'bext', 'signal', 'md5'] }
+  opts.on('-b', '--bext-scan') { options << 'bext' }
+  opts.on('-c', '--checksum') { options << 'md5' }
+  opts.on('-d', '--dropout-scan') { options << 'dropouts' }
+  opts.on('-e', '--Extension=val', String) { |val| TARGET_EXTENSION = val.downcase }
+  opts.on('-m', '--meta-scan') { options << 'meta' }
+  opts.on('-o', '--options') { options << 'edit-options'}
+  opts.on('-p', '--Policy=val', String) { |val| POLICY_FILE = val }
+  opts.on('-s', '--signal-scan') { options << 'signal' }
+  opts.parse!
+end
+
+if options.include?('edit-options')
+  if System == 'linux'
+    system('xdg-open', config_file)
+  elsif System == 'mingw32'
+    system('start','notepad', config_file)
+  else
+    system('open', config_file)
+  end
+  exit
+elsif options.count == 0 && ARGV.count == 0
+  puts 'For list of available options please run: audioqc -h'
+  exit
+elsif options.count == 0
+  options = Configurations['default_options']
+end
+
+
+# set up arrays and variables
+TARGET_EXTENSION = Configurations['default_extension'] unless defined? TARGET_EXTENSION
+
+# set up output CSV path
+timestamp = Time.now.strftime('%Y-%m-%d_%H-%M-%S')
+if Configurations['csv_output_path'].empty?
+  output_csv = ENV['HOME'] + "/Desktop/audioqc-out_#{timestamp}.csv"
+else
+  output_csv = Configurations['csv_output_path'] + "/audioqc-out_#{timestamp}.csv" 
+end
+if ! Dir.exist?(File.dirname(output_csv))
+  puts "Output directory not found. Please configure a valid output directory"
+  exit 1
+end
+
+# Start embedded WAV Mediaconch policy section
+# Policy derived from MediaConch Public Policies. Original Maintainer Peter B. License: CC-BY-4.0+
+mc_policy = <<~EOS
+  <?xml version="1.0"?>
+  <policy type="and" name="Local Wave Policy" license="CC-BY-4.0+">
+    <description>This is the common norm for WAVE audiofiles.&#xD;
+  Any WAVs not matching this policy should be inspected and possibly normalized to conform to this.</description>
+    <policy type="or" name="Signed Integer or Float?">
+      <rule name="Is signed Integer?" value="Format_Settings_Sign" tracktype="Audio" occurrence="*" operator="=">Signed</rule>
+      <rule name="Is floating point?" value="Format_Profile" tracktype="Audio" occurrence="*" operator="=">Float</rule>
+    </policy>
+    <policy type="and" name="Audio: Proper resolution?">
+      <description>This policy defines audio-resolution values that are proper for WAV.</description>
+      <policy type="or" name="Valid samplerate?">
+        <description>This was not implemented as rule in order to avoid irregular sampling rates.</description>
+        <!-- <rule name="Audio is 44.1 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">44100</rule> -->
+        <!-- <rule name="Audio is 48 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">48000</rule> -->
+        <!-- <rule name="Audio is 88.2 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">88200</rule> -->
+        <rule name="Audio is 96 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">96000</rule>
+        <!-- <rule name="Audio is 192 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">192000</rule> -->
+        <!-- <rule name="Audio is 11 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">11025</rule> -->
+        <!-- <rule name="Audio is 22.05 kHz?" value="SamplingRate" tracktype="Audio" occurrence="*" operator="=">22050</rule> -->
+      </policy>
+      <policy type="or" name="Valid bit depth?">
+        <!-- <rule name="Audio is 16 bit?" value="BitDepth" tracktype="Audio" occurrence="*" operator="=">16</rule> -->
+        <rule name="Audio is 24 bit?" value="BitDepth" tracktype="Audio" occurrence="*" operator="=">24</rule>
+        <!-- <rule name="Audio is 32 bit?" value="BitDepth" tracktype="Audio" occurrence="*" operator="=">32</rule> -->
+        <!-- <rule name="Audio is 8 bit?" value="BitDepth" tracktype="Audio" occurrence="*" operator="=">8</rule> -->
+      </policy>
+    </policy>
+    <policy type="and" name="Is BWF?">
+      <rule name="BEXT Exist?" value="Wave/Broadcast extension/" occurrence="*" operator="exists" scope="mmt"/>
+    </policy>
+    <policy type="and" name="Valid File Size?">
+      <rule name="Size Limit" value="FileSize" tracktype="General" occurrence="*" operator="&lt;">4000000000</rule>
+    </policy>
+    <rule name="Container is RIFF (WAV)?" value="Format" tracktype="General" occurrence="*" operator="=">Wave</rule>
+    <rule name="Encoding is linear PCM?" value="Format" tracktype="Audio" occurrence="*" operator="=">PCM</rule>
+    <rule name="Audio is 'Little Endian'?" value="Format_Settings_Endianness" tracktype="Audio" occurrence="*" operator="=">Little</rule>
+  </policy>
+EOS
+# End embedded WAV Mediaconch policy section
+
+if TARGET_EXTENSION == 'wav'
+  unless defined? POLICY_FILE
+    POLICY_FILE = Tempfile.new('mediaConch')
+    POLICY_FILE.write(mc_policy)
+    POLICY_FILE.rewind
+  end
+end
+
+class QcTarget
+  def initialize(value)
+    @input_path = value
+    @warnings = []
+  end
+  
+  def check_dropouts
+    @sample_ratios = []
+    @possible_drops = []
+    @ffprobe_out['frames'].each do |frames|
+      @sample_ratios << frames['tags']['lavfi.astats.Overall.Max_difference'].to_f / frames['tags']['lavfi.astats.Overall.Mean_difference'].to_f
+    end
+    @sample_ratios.each_with_index do |ratio, i|
+      unless i + 1 == @sample_ratios.length
+        diff_prior = (ratio - @sample_ratios[i - 1]).abs
+        diff_post = (ratio - @sample_ratios[i + 1]).abs
+        if diff_prior > 15 && diff_post > 15
+          # I think there is something wonky with how ffmpeg splits to frames vs samples - this math for finding time needs to be looked at
+          @possible_drops << normalize_time(i * @ffprobe_out['frames'][0]['tags']['lavfi.astats.Overall.Number_of_samples'].to_f / @mediainfo_out['media']['track'][1]['SamplingRate'].to_f) 
+        end
+      end
+    end
+    @warnings << "Possible Dropouts Detected" if @possible_drops.length > 0
+  end
+
+  def check_md5
+    puts "Verifying embedded MD5 for #{@input_path}"
+    md5_output = `bwfmetaedit --MD5-Verify -v "#{@input_path}" 2>&1`.chomp.split("\n")
+    if md5_output.any? {|line| line.include?('MD5, no existing MD5 chunk')}
+      @warnings << 'No MD5'
+      @md5_status = 'No MD5'
+    elsif md5_output.any? {|line| line.include?('MD5, failed verification')}
+      @warnings << 'Failed MD5 Verification'
+      @md5_status = 'Failed'
+    elsif ! md5_output.any? {|line| line.include?('MD5, verified')}
+      @warnings << 'MD5 check unable to be performed'
+      @md5_status = 'MD5 check unable to be performed'
+    else
+      @md5_status = 'Pass'
+    end
+  end
+
+  def check_metaedit
+    scan_output = `bwfmetaedit "#{@input_path}" 2>&1`.chomp.chomp
+    @wave_conformance = scan_output.split(':').last.strip if scan_output.include?('invalid')
+    if @wave_conformance.nil?
+      @wave_conformance = ' '
+    else
+      @warnings << "Invalid Wave Detected" unless @wave_conformance.nil?
+    end
+  end
+
+  def get_ffprobe_phase_normalized(volume_command)
+    ffprobe_command = 'ffmpeg -i ' + @input_path + volume_command + ' -f wav - | ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.aphasemeter.phase -f lavfi -i "amovie=' + "'" + 'pipe\\:0' + "'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+    @ffprobe_phase = JSON.parse(`#{ffprobe_command}`)
+  end
+
+  def get_ffprobe
+    if @channel_count == "2"
+      channel_one_vol = []
+      channel_two_vol = []
+      ffprobe_command = "ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,ebur128=metadata=1"'
+      ffprobe_command.gsub!(':','\:')
+      @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
+      @ffprobe_out['frames'].each do |frame|
+        if frame['tags']['lavfi.astats.1.Peak_level'] == '-inf' || frame['tags']['lavfi.astats.2.Peak_level'] == '-inf'
+          next
+        else
+          channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f
+          channel_two_vol << frame['tags']['lavfi.astats.2.Peak_level'].to_f
+        end
+      end
+      @channel_one_max = channel_one_vol.max
+      @channel_two_max = channel_two_vol.max
+      channel_dif = (channel_one_vol.max - channel_two_vol.max).abs.to_s
+      if channel_two_vol.max < channel_one_vol.max
+        @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[b]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[a][c]amerge[out1]" -map [out1] '
+      else
+        @volume_command = ' -filter_complex "[0:a]channelsplit[a][b],[a]volume=volume=' + channel_dif + 'dB:precision=fixed[c],[c][b]amerge[out1]" -map [out1] '
+      end
+      get_ffprobe_phase_normalized(@volume_command)
+    else
+      ffprobe_command = "ffprobe -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.aphasemeter.phase,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,aphasemeter=video=0,ebur128=metadata=1"'
+      ffprobe_command.gsub!(':','\:')
+      @ffprobe_out = JSON.parse(`#{ffprobe_command}`)
+      @ffprobe_phase = @ffprobe_out
+    end
+    @total_frame_count = @ffprobe_out['frames'].size
+  end
+
+  def check_phase
+    out_of_phase_frames = []
+    phase_frames = []
+    unless @mediainfo_out['media']['track'][0]['extra'].nil? || TARGET_EXTENSION != 'wav'
+      if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+        @stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+        @dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/dual/i).count
+      end
+    end
+    if ! @dual_count.nil? && ! @stereo_count.nil?
+      if @dual_count > 0
+        phase_limit = Configurations['dualmono_audio_phase_limit']
+      elsif @stereo_count > 1
+        phase_limit = Configurations['stereo_audio_phase_limit']
+      else
+        phase_limit = Configurations['generic_audio_phase_limit']
+      end
+    else
+      phase_limit = Configurations['generic_audio_phase_limit']
+    end
+    @ffprobe_phase['frames'].each do |frames|
+      audiophase = frames['tags']['lavfi.aphasemeter.phase'].to_f
+      phase_frames << audiophase
+      out_of_phase_frames << audiophase if audiophase < phase_limit
+    end
+    @phasey_frame_count = out_of_phase_frames.size
+    if Ruby_Version > 2.7
+      @average_phase = (phase_frames.sum(0.0) / phase_frames.size).round(2)
+    else
+      @average_phase = (phase_frames.reduce(:+) / phase_frames.size).round(2)
+    end
+    @warnings << 'PHASE WARNING' if @phasey_frame_count > 50
+  end
+
+  def find_peaks_loudness_n_phase
+    high_db_frames = []
+    @levels = []
+    @ffprobe_out['frames'].each do |frames|
+      peaklevel = frames['tags']['lavfi.astats.Overall.Peak_level'] 
+      if peaklevel != '-inf'
+        high_db_frames << peaklevel.to_f if peaklevel.to_f > Configurations['high_level_warning']
+        @levels << peaklevel.to_f
+      end
+    end
+
+    @max_level = @levels.max.round(2)
+    @high_level_count = high_db_frames.size
+    if Ruby_Version > 2.7
+      @average_levels = (@levels.sum(0.0) / @levels.size).round(2)
+    else
+      @average_levels = (@levels.reduce(:+) / @levels.size).round(2)
+    end
+    @integratedLoudness = @ffprobe_out['frames'][@ffprobe_out.length - 3]['tags']['lavfi.r128.I']
+    @warnings << 'LEVEL WARNING' if @high_level_count > 0
+  end
+
+  def get_mediainfo
+    @mediainfo_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
+    @duration_normalized = Time.at(@mediainfo_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
+    @channel_count = @mediainfo_out['media']['track'][1]['Channels']
+  end
+
+  # Function to scan file for mediaconch compliance
+  def media_conch_scan(policy)
+    if File.file?(policy)
+      @qc_results = []
+      policy_path = File.path(policy)
+      command = 'mediaconch --Policy=' + '"' + policy_path + '" ' + '"' + @input_path + '"'
+      media_conch_out = `#{command}`.gsub(@input_path, "")
+      media_conch_out.strip!
+      media_conch_out.split('/n').each {|qcline| @qc_results << qcline}
+      @qc_results = @qc_results.to_s.gsub('\n   -- ', '; ')
+      if File.exist?(policy)
+        if @qc_results.include?('pass!')
+          @qc_results = 'PASS'
+        else
+          @warnings << 'MEDIACONCH FAIL'
+        end
+      end
+    else
+      @qc_results = policy
+    end
+  end
+
+  def normalize_time(time_source)
+    Time.at(time_source).utc.strftime('%H:%M:%S:%m')
+  end
+
+  def output_csv_line(options)
+    if options.include?('error')
+      line = [@input_path, 'FAILED TO PARSE']
+    else
+      line = [@input_path, @warnings.flatten.join(', '), @duration_normalized, @channel_count]
+    end
+    if options.include?('dropouts')
+      line << @possible_drops
+    end
+    if options.include?('signal')
+      line += [@average_levels, @max_level,@high_level_count]
+      if @channel_count == "2"
+        line+= [@channel_one_max,@channel_two_max]
+      else
+        line += [' ', ' ']
+      end
+      line +=[@average_phase, @phasey_frame_count, @integratedLoudness]
+    end
+    if options.include?('meta')
+      line += [@wave_conformance] unless TARGET_EXTENSION != 'wav'
+      line += [@qc_results]
+    end
+
+    if options.include?('md5')
+      line += [@md5_status]
+    end
+    if options.include?('bext')
+      line += [@encoding_history]
+    end
+    return line
+  end
+
+  def output_warnings
+    @warnings
+  end
+
+  def qc_encoding_history
+    if TARGET_EXTENSION == 'wav'
+    @enc_hist_error = []
+      unless @mediainfo_out['media']['track'][0]['extra'].nil?
+        if @mediainfo_out['media']['track'][0]['extra']['bext_Present'] == 'Yes' && @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+          @encoding_history = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings']
+          signal_chain_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/A=/).count
+          if @channel_count == "1"
+            unless @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/mono/i).count == signal_chain_count
+              @enc_hist_error << "BEXT Coding History channels don't match file"
+            end
+          end
+
+          if @channel_count == "2"
+            @stereo_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].scan(/stereo/i).count
+            @dual_count = @mediainfo_out['media']['track'][0]['Encoded_Library_Settings'].gsub("dual-sided","").scan(/dual/i).count
+            unless @stereo_count + @dual_count == signal_chain_count
+              @enc_hist_error << "BEXT Coding History channels don't match file"
+            end
+          end
+        end
+      else
+        @enc_hist_error << "Encoding history not present"
+      end
+      @warnings << @enc_hist_error if @enc_hist_error.size > 0
+    end
+  end
+end
+
+def write_csv_line(output_csv,line)
+  CSV.open(output_csv, 'a') do |csv|
+    csv << line
+  end
+end
+
+# Make list of inputs
+file_inputs = []
+write_to_csv = []
+ARGV.each do |input|
+  input_normalized = input.gsub('\\','/')
+  # If input is directory, recursively add all files with target extension to target list
+  if File.directory?(input_normalized)
+    targets = Dir["#{input_normalized}/**/*.{#{TARGET_EXTENSION.upcase},#{TARGET_EXTENSION.downcase}}"]
+    targets.each do |file|
+      file_inputs << file
+    end
+  # If input is file, add it to target list (if extension matches target extension)
+  elsif File.extname(input_normalized).downcase == '.' + TARGET_EXTENSION.downcase && File.exist?(input)
+    file_inputs << input
+  else
+    puts "Input: #{input} not found!"
+  end
+end
+
+if file_inputs.empty?
+  puts 'No targets found!'
+  exit
+else
+  file_inputs.sort!
+end
+
+
+# Begin CSV
+CSV.open(output_csv, 'wb') do |csv|
+  headers = ['Filename', 'Warnings', 'Duration', 'Channels']
+  if options.include?('dropouts')
+    headers << 'Possible Drops'
+  end
+
+  if options.include?('signal')
+    headers += ['Average Level', 'Peak Level', 'Number of Frames w/ High Levels', 'Channel 1 Max', 'Channel 2 Max', 'Average Phase', 'Number of Phase Warnings', 'Integrated Loudness']
+  end
+
+  if options.include?('meta')
+    headers << 'Wave Conformance Errors' unless TARGET_EXTENSION != 'wav'
+    headers <<  'MediaConch Policy Compliance'
+  end
+
+  if options.include?('md5')
+    headers << 'MD5 check'
+  end
+
+  if options.include?('bext')
+    headers << 'Coding History'
+  end
+  csv << headers
+end
+
+
+# Scan files
+file_inputs.each do |fileinput|
+  begin
+    puts "Scanning: #{fileinput}"
+    targetPath = File.expand_path(fileinput)
+    target = QcTarget.new(targetPath)
+    target.get_mediainfo
+    if options.include?('meta')
+      if defined? POLICY_FILE
+        target.media_conch_scan(POLICY_FILE)
+      else
+        target.media_conch_scan('Valid Policy File Not Found')
+      end
+      target.check_metaedit unless TARGET_EXTENSION != 'wav'
+    end
+    if options.include?('bext')
+      target.qc_encoding_history
+    end
+    if options.include?('md5')
+      target.check_md5
+    end
+    if options.include?('signal') || options.include?('dropouts')
+      target.get_ffprobe
+      if options.include?('signal')
+        target.find_peaks_loudness_n_phase
+        target.check_phase
+      end
+      if options.include?('dropouts')
+        target.check_dropouts
+      end
+    end
+    write_csv_line(output_csv,target.output_csv_line(options))
+  rescue
+    puts "Error scanning: #{targetPath}"
+    write_csv_line(output_csv,target.output_csv_line('error'))
+  end
+end
