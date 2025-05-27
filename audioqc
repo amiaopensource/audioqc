@@ -44,7 +44,6 @@ output_csv_name = "audioqc-out_#{timestamp}.csv"
 output_csv = "#{output_csv_path}/#{output_csv_name}"
 output_jpg_dir = "#{output_csv_path}/#{timestamp}_jpgs"
 
-
 #QC each input and output to CSV
 file_inputs.each {|file| qc_files << QcTarget.new(file)}
 
@@ -81,7 +80,6 @@ end
 # end
 #Calculate average phase
 # phase_data = Parallel.map(qc_files, in_processes: 1) {|file| file.phase}
-
 # phase_data.each_with_index do |phase, index|
 #   qc_files[index].store_phase(phase)
 # end
