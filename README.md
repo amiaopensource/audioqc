@@ -3,7 +3,7 @@
 ## About
 This tool is intended to assist with batch/collection level quality control of archival WAV files digitized from analog sources. It can target directories and single audio files, and will generate audio quality control reports in CSV to the desktop or user specified location. It scans for peak/average audio levels, files with 'hot' portions exceeding a user set limit, audio phase, file integrity (from embedded MD5 checksums), bext metadata conformance and mediaconch policy conformance. It also can generate images of the audio spectrum and waveform of each input file.
 
-Development note: This tool was rewritten in 2025 to simplify usage, code and dependencies. For the legacy code, see [here](https://github.com/amiaopensource/audioqc/tree/new-code-base/deprecated) or the [final release](https://github.com/amiaopensource/audioqc/releases/tag/2025-05-23) containing the previous code.
+Development note: This tool was rewritten in 2025 to simplify usage, code and dependencies. For the legacy code, see [here](https://github.com/amiaopensource/audioqc/tree/master/deprecated) or the [final release](https://github.com/amiaopensource/audioqc/releases/tag/2025-05-23) containing the previous code.
 
 
 ## Setup
