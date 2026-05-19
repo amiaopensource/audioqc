@@ -3,8 +3,8 @@
 require 'json'
 require 'csv'
 require 'optparse'
-load 'audioqc_methods.rb'
-load_options('settings.csv')
+load __dir__ + '/audioqc_methods.rb'
+load_options(__dir__  + '/settings.csv')
 ARGV << '-h' if ARGV.empty?
 
 #Set up options
@@ -13,6 +13,7 @@ parser.banner = "Usage: ruby audioqc2.rb [options] [inputs]"
 parser.on('-o', '--output=val', "Optional output path for CSV file", String) { |val| $output_path_custom = val }
 parser.on('-c', '--conch=val', "Path to optional mediaconch policy XML file", String) { |val| $conch_policy = val }
 parser.on('-j', '--jpg', "Create visualizations of input files") { $visualize_yes = true }
+parser.on('-r', '--report', "Continue on existing report file") { |val| $existing_report = val }
 parser.parse!
 
 #Get targets from file or directory input(s)
