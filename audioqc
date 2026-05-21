@@ -3,8 +3,26 @@
 require 'json'
 require 'csv'
 require 'optparse'
-load __dir__ + '/audioqc_methods.rb'
-load_options(__dir__  + '/settings.csv')
+
+if File.exist?(__dir__ + '/audioqc_methods.rb')
+  load __dir__ + '/audioqc_methods.rb'
+elsif File.exist?(`brew --prefix`.to_s.chomp + '/etc/audioqc_methods.rb')
+  load `brew --prefix`.to_s.chomp + '/etc/audioqc_methods.rb'
+else
+  puts 'Missing audioqc_methods.rb - double check installation'
+  exit
+end
+
+
+if File.exist?(__dir__  + '/settings.csv')
+  load_options(__dir__ + '/settings.csv')
+elsif File.exist?(`brew --prefix`.to_s.chomp + '/etc/settings.csv')
+  load_options(`brew --prefix`.to_s.chomp + '/etc/settings.csv')
+else
+  puts 'Missing settings.csv - double check installation'
+  exit
+end
+
 ARGV << '-h' if ARGV.empty?
 
 #Set up options
