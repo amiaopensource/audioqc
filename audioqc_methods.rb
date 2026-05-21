@@ -8,6 +8,11 @@ def load_options(option_file)
   $ffmpeg_path = options[1][5]
   $ffprobe_path = options[1][6]
   $mediaconch_path = options[1][7]
+  if ! File.exist?($conch_policy)
+    if File.exist?(`brew --prefix`.to_s.chomp + '/etc/media_conch_policy.xml')
+      $conch_policy = `brew --prefix`.to_s.chomp + '/etc/media_conch_policy.xml'
+    end
+  end
   $ffmpeg_path = 'ffmpeg' if ! File.exist?($ffmpeg_path.to_s)
   $ffprobe_path = 'ffprobe' if ! File.exist?($ffprobe_path.to_s)
   $mediaconch_path = 'mediaconch' if ! File.exist?($mediaconch_path.to_s)
