@@ -33,8 +33,10 @@ class QcTarget
     channel_one_vol = []
     channel_two_vol = []
     overall_volume = []
+    @silence_info_one = []
+    @silence_info_two = []
     @high_volume_count = 0
-    ffprobe_command = "#{$ffprobe_path} -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,ebur128=metadata=1"'
+    ffprobe_command = "#{$ffprobe_path} -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.silence_start.1,lavfi.silence_end.1,lavfi.silence_duration.1,lavfi.silence_start.2,lavfi.silence_end.2,lavfi.silence_duration.2,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,ebur128=metadata=1,silencedetect=noise=-30dB:duration=0.5:mono=1"'
     ffprobe_command.gsub!(':','\:')
     ffprobe_out = JSON.parse(`#{ffprobe_command}`)
     ffprobe_out['frames'].each do |frame|
@@ -44,14 +46,18 @@ class QcTarget
         channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f.round(2)
         channel_two_vol << frame['tags']['lavfi.astats.2.Peak_level'].to_f.round(2) unless frame['tags']['lavfi.astats.2.Peak_level'].nil?
         overall_volume << frame['tags']['lavfi.astats.Overall.Peak_level'].to_f.round(2)
+        @silence_info_one << frame['tags']['lavfi.silence_start.1'] unless frame['tags']['lavfi.silence_start.1'].nil?
+        @silence_info_one << frame['tags']['lavfi.silence_duration.1'] unless frame['tags']['lavfi.silence_duration.1'].nil?
+        @silence_info_two << frame['tags']['lavfi.silence_start.2'] unless frame['tags']['lavfi.silence_start.2'].nil?
+        @silence_info_two << frame['tags']['lavfi.silence_duration.2'] unless frame['tags']['lavfi.silence_duration.2'].nil?
       end
     end
-  @integratedLoudness = ffprobe_out['frames'][ffprobe_out.length - 3]['tags']['lavfi.r128.I']
-  @channel_one_max = channel_one_vol.max
-  @channel_two_max = channel_two_vol.max
-  @overall_volume_max = overall_volume.max
-  overall_volume.each {|volume| @high_volume_count += 1 if volume > $high_volume}
-  output = [@channel_one_max, @channel_two_max, @overall_volume_max, @integratedLoudness]
+    @integratedLoudness = ffprobe_out['frames'][ffprobe_out.length - 3]['tags']['lavfi.r128.I']
+    @channel_one_max = channel_one_vol.max
+    @channel_two_max = channel_two_vol.max
+    @overall_volume_max = overall_volume.max
+    overall_volume.each {|volume| @high_volume_count += 1 if volume > $high_volume}
+    output = [@channel_one_max, @channel_two_max, @overall_volume_max, @integratedLoudness]
   end
 
   def phase
