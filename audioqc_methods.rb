@@ -36,7 +36,7 @@ class QcTarget
     @silence_info_one = []
     @silence_info_two = []
     @high_volume_count = 0
-    ffprobe_command = "#{$ffprobe_path} -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.silence_start.1,lavfi.silence_end.1,lavfi.silence_duration.1,lavfi.silence_start.2,lavfi.silence_end.2,lavfi.silence_duration.2,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,ebur128=metadata=1,silencedetect=noise=-30dB:duration=0.5:mono=1"'
+    ffprobe_command = "#{$ffprobe_path} -print_format json -threads auto -show_entries frame_tags=lavfi.astats.Overall.Number_of_samples,lavfi.astats.Overall.Peak_level,lavfi.astats.Overall.Max_difference,lavfi.astats.1.Peak_level,lavfi.astats.2.Peak_level,lavfi.astats.1.Peak_level,lavfi.astats.Overall.Mean_difference,lavfi.astats.Overall.Peak_level,lavfi.silence_start.1,lavfi.silence_end.1,lavfi.silence_duration.1,lavfi.silence_start.2,lavfi.silence_end.2,lavfi.silence_duration.2,lavfi.r128.I -f lavfi -i \"amovie='#{@input_path}'" + ',astats=reset=1:metadata=1,ebur128=metadata=1,silencedetect=noise=-40dB:duration=30:mono=1"'
     ffprobe_command.gsub!(':','\:')
     ffprobe_out = JSON.parse(`#{ffprobe_command}`)
     ffprobe_out['frames'].each do |frame|
@@ -46,10 +46,10 @@ class QcTarget
         channel_one_vol << frame['tags']['lavfi.astats.1.Peak_level'].to_f.round(2)
         channel_two_vol << frame['tags']['lavfi.astats.2.Peak_level'].to_f.round(2) unless frame['tags']['lavfi.astats.2.Peak_level'].nil?
         overall_volume << frame['tags']['lavfi.astats.Overall.Peak_level'].to_f.round(2)
-        @silence_info_one << frame['tags']['lavfi.silence_start.1'] unless frame['tags']['lavfi.silence_start.1'].nil?
-        @silence_info_one << frame['tags']['lavfi.silence_duration.1'] unless frame['tags']['lavfi.silence_duration.1'].nil?
-        @silence_info_two << frame['tags']['lavfi.silence_start.2'] unless frame['tags']['lavfi.silence_start.2'].nil?
-        @silence_info_two << frame['tags']['lavfi.silence_duration.2'] unless frame['tags']['lavfi.silence_duration.2'].nil?
+        @silence_info_one << frame['tags']['lavfi.silence_start.1'].to_f.round(1) unless frame['tags']['lavfi.silence_start.1'].nil?
+        @silence_info_one << frame['tags']['lavfi.silence_duration.1'].to_f.round(1) unless frame['tags']['lavfi.silence_duration.1'].nil?
+        @silence_info_two << frame['tags']['lavfi.silence_start.2'].to_f.round(1) unless frame['tags']['lavfi.silence_start.2'].nil?
+        @silence_info_two << frame['tags']['lavfi.silence_duration.2'].to_f.round(1) unless frame['tags']['lavfi.silence_duration.2'].nil?
       end
     end
     @integratedLoudness = ffprobe_out['frames'][ffprobe_out.length - 3]['tags']['lavfi.r128.I']
@@ -87,6 +87,7 @@ class QcTarget
   def media_info
     @media_info_out = JSON.parse(`mediainfo --Output=JSON "#{@input_path}"`)
     @channel_count = @media_info_out['media']['track'][1]['Channels']
+    @duration = @media_info_out['media']['track'][0]['Duration'].to_f
     @duration_normalized = Time.at(@media_info_out['media']['track'][0]['Duration'].to_f).utc.strftime('%H:%M:%S')
     #check for BEXT coding history metadata
     if (@media_info_out['media']['track'][0]['extra'] != nil)
@@ -172,6 +173,27 @@ class QcTarget
         end
       end
     end
+
+    # Check for long periods of silence
+    @silence_info_one = @silence_info_one.each_slice(2).to_a
+    @silence_info_two = @silence_info_two.each_slice(2).to_a
+    @silence_info_one.each do |silence|
+      if silence.length == 1
+        silence << (@duration - silence[0]).round(1)
+      end
+      @long_silence = true if silence[0] > 30
+      @empty_track = true if (@duration - silence[0]) < 20 
+    end
+
+    @silence_info_two.each do |silence|
+      if silence.length == 1
+        silence << (@duration - silence[0]).round(1)
+      end
+      @long_silence = true if silence[0] > 30
+      @empty_track = true if (@duration - silence[0]) < 20
+    end
+    @warnings << 'Long silences present' if @long_silence
+    @warnings << 'Potentially empty channel detected' if @empty_track
     @status = 'pass'
   end
 
@@ -206,7 +228,7 @@ class QcTarget
     if @status == 'fail'
       line = [@input_path, 'Failed to Scan']
     elsif @status == 'pass'
-      line = [@input_path,@warnings.flatten.join(', '),@channel_count, @duration_normalized, @overall_volume_max, @channel_one_max,@channel_two_max,@high_volume_count,@average_phase,@integratedLoudness,@md5_alert, @conch_result, @conch_failures.flatten.join(', '),@coding_history]
+      line = [@input_path,@warnings.flatten.join(', '),@channel_count, @duration_normalized, @overall_volume_max, @channel_one_max,@channel_two_max,@high_volume_count,@average_phase,@integratedLoudness,@md5_alert, @conch_result, @conch_failures.flatten.join(', '),@coding_history,@silence_info_one,@silence_info_two]
     end
     CSV.open(output_csv, 'a') do |csv|
       csv << line
